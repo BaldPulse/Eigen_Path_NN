@@ -32,7 +32,7 @@ def load_data(path):
     edge_adj = np.load(path+'adj.npy')
     return flows, edge_adj
 
-path = '/home/zhaotang/Documents/eigen_path/gcn/data/'
+path = '/home/zhaotang/Documents/eigen_path/gcn/data/1/'
 n_features = 1
 n_paths    = 2
 
@@ -44,7 +44,7 @@ weights = {
     'decoder': tf.Variable(tf.random_normal([n_paths, n_features]))
 }
 
-training_epochs = 1000000000
+training_epochs = 300
 batch_size = 32
 dropout = tf.placeholder("float")
 
@@ -57,13 +57,16 @@ optimizer  = tf.train.AdamOptimizer(learning_rate=0.0001).minimize(loss)
 We_print   = tf.print("encoder:", weights['encoder'], output_stream=sys.stdout)
 Wd_print   = tf.print("decoder:", weights['decoder'], output_stream=sys.stdout)
 
+path_val = '/home/zhaotang/Documents/eigen_path/gcn/data/2/'
+
+flows_val, edge_adj_val = load_data(path_val)
+
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
     
     for epoch in range(training_epochs):
         avg_loss = 0.0
         total_batch = int(len(flows) / batch_size)
-        flows_batches = np.array_split(flows, total_batch)
         for i in range(total_batch-1):
             batch_X = flows[i*32:(i+1)*32]
             _, c = sess.run([optimizer, loss], 
@@ -77,3 +80,15 @@ with tf.Session() as sess:
         if(avg_loss < 0.5):
             break
     sess.run([We_print, Wd_print])
+    
+    avg_loss_val = 0.0
+    total_batch_val = int(len(flows_val) / batch_size)
+    for i in range(total_batch_val-1):
+        batch_X_val = flows_val[i*32:(i+1)*32]
+        [c] = sess.run([loss],
+                     feed_dict={
+                         X: batch_X_val,
+                         dropout: 0.2
+                     })
+        avg_loss_val += c / total_batch_val
+    print("Validation loss:", avg_loss_val)
