@@ -48,12 +48,22 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
 def load_data(path):
     flows = np.load(os.path.join(path, 'flows.npy'))
     edge_adj = np.load(os.path.join(path, 'adj.npy'))
-    return flows, edge_adj
+    try:
+        expected_paths = np.load(os.path.join(path, 'paths.npy'))
+    except IOError:
+        expected_paths = None
+        print('no expected paths in'+path)
+    try:
+        noiseless_flows = np.load(os.path.join(path, 'noiseless_flows.npy'))
+    except IOError:
+        noiseless_flows = None
+        print('no noiseless flows in'+path)
+    return flows, noiseless_flows, edge_adj, expected_paths
 
 
 
-path = '../data/3/'
-flows, edge_adj = load_data(path)
+path = '../data/4/'
+flows, noiseless_flows, edge_adj, expected_paths = load_data(path)
 flows = np.expand_dims(flows, 2)
 A = prepare_adj(edge_adj)
 A = np.tile(np.expand_dims(A, 0), (flows.shape[0], 1, 1))  # Adding a dummy batch dimension
@@ -92,13 +102,11 @@ model.save(path+'sgc.h5')
 
 print(model.summary())
 paths = model.get_layer('decoder').get_weights()[0]
-e_paths = np.array([[ 0,  0,  0,  0,  7,  0,  0,  0,  0,  0,  0,  5,  0,  0,  0,  0, 10,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  3,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-                      0,  0,  0,  0,  0]])
 print(paths) # Decoder weights
 print(paths.shape)
-print(e_paths.shape)
-w = e_paths @ paths.T/(paths @ paths.T)
-print((w * paths).astype('int'))
+if(not expected_paths is None):
+    print(expected_paths.shape)
+    w = expected_paths @ paths.T/(paths @ paths.T)
+    print((w * paths).astype('int'))
 # To predict after fitting the model:
 #model.predict(x={foobar})
