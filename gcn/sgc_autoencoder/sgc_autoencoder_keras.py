@@ -62,16 +62,17 @@ def load_data(path):
 
 
 
-path = '../data/4/'
+path = '../data/5/'
 flows, noiseless_flows, edge_adj, expected_paths = load_data(path)
 flows = np.expand_dims(flows, 2)
+noiseless_flows = np.expand_dims(noiseless_flows, 2)
 A = prepare_adj(edge_adj)
 A = np.tile(np.expand_dims(A, 0), (flows.shape[0], 1, 1))  # Adding a dummy batch dimension
 
 n_edges = flows.shape[1]
 n_sgc_feats = 2
 n_flows = 5
-n_paths = 1
+n_paths = 2
 
 learning_rate = 0.0003
 batch_size = 32
@@ -90,7 +91,7 @@ model.compile(
 
 model.fit(
     x={'input_node_features': flows, 'adjacency': A},
-    y=flows,
+    y=noiseless_flows,
     batch_size=batch_size,
     epochs=n_epochs,
     # validation data=(x={F, A}, Y=F), to include validation data here, 
@@ -106,7 +107,8 @@ print(paths) # Decoder weights
 print(paths.shape)
 if(not expected_paths is None):
     print(expected_paths.shape)
+    print(expected_paths)
     w = expected_paths @ paths.T/(paths @ paths.T)
-    print((w * paths).astype('int'))
+    print((w @ paths).astype('int'))
 # To predict after fitting the model:
 #model.predict(x={foobar})
