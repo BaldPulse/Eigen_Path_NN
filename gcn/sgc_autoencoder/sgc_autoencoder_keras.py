@@ -59,9 +59,9 @@ A = prepare_adj(edge_adj)
 A = np.tile(np.expand_dims(A, 0), (flows.shape[0], 1, 1))  # Adding a dummy batch dimension
 
 n_edges = flows.shape[1]
-n_sgc_feats = 32
+n_sgc_feats = 2
 n_flows = 5
-n_paths = 5
+n_paths = 1
 
 learning_rate = 0.0003
 batch_size = 32
@@ -88,8 +88,17 @@ model.fit(
     # saving model to a file via callbacks, etc 
 )
 
-print(model.summary())
-#print(model.get_layer('decoder').get_weights()[0]) # Decoder weights
+model.save(path+'sgc.h5')
 
+print(model.summary())
+paths = model.get_layer('decoder').get_weights()[0]
+e_paths = np.array([[ 0,  0,  0,  0,  7,  0,  0,  0,  0,  0,  0,  5,  0,  0,  0,  0, 10,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  3,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+                      0,  0,  0,  0,  0]])
+print(paths) # Decoder weights
+print(paths.shape)
+print(e_paths.shape)
+w = e_paths @ paths.T/(paths @ paths.T)
+print((w * paths).astype('int'))
 # To predict after fitting the model:
 #model.predict(x={foobar})
