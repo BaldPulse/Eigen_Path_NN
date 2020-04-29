@@ -5,6 +5,8 @@ os.environ["CUDA_VISIBLE_DEVICES"]=""
 import tensorflow as tf
 import numpy as np
 import numpy.linalg as npla
+from sgc_util_keras import *
+
 
 def prepare_adj(adj):
     I = np.identity(adj.shape[0])
@@ -19,7 +21,6 @@ def sgc_layer(H, A, featsize, numhop):
     layer = tf.keras.layers.Dense(featsize)(layer)
     return layer
 
-def decode(latent, )
 
 def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     '''
@@ -93,16 +94,17 @@ model.compile(
     # e.g. difference between the decoder weight and ground truth paths.
 )
 
-log_dir = '../log/5'
+log_dir = './log'
 
-tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir,  histogram_freq=1)
+tbi_callback = TensorBoardImage('Image Example')
 
 model.fit(
     x={'input_node_features': flows, 'adjacency': A},
     y=flows,
     batch_size=batch_size,
     epochs=n_epochs,
-    callbacks=[tensorboard_callback]
+    callbacks=[tensorboard_callback, tbi_callback]
     # validation data=(x={F, A}, Y=F), to include validation data here, 
     # you could also include logging to a file via callbacks,
     # saving model to a file via callbacks, etc 
@@ -113,8 +115,9 @@ model.save(path+'sgc.h5')
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 print(model.summary())
-paths = model.get_layer('decoder').get_weights()[0]
-print(paths) # Decoder weights
+paths = model.get_layer('decoder').get_weights()
+print(paths)
+'''print(paths) # Decoder weights
 print(paths.shape)
 if(not expected_paths is None):
     for p in paths:
@@ -131,5 +134,6 @@ if(not expected_paths is None):
                 mep = ep
         print(mp)
         print(mep)
+'''
 # To predict after fitting the model:
 #model.predict(x={foobar})
