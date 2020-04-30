@@ -12,12 +12,12 @@ class sgc_decoder(Layer):
                  output_dim,
                  activation=None,                 
                  kernel_initializer='glorot_uniform',
-                 bias_initializer='zeros',
+                 kernel_regularizer=None,
                  **kwargs):
         self.output_dim = output_dim
         self.activation = keras.activations.get(activation)
         self.kernel_initializer = keras.initializers.get(kernel_initializer)
-        self.bias_initializer = keras.initializers.get(bias_initializer)
+        self.kernel_regularizer = keras.regularizers.get(kernel_regularizer)
         super(sgc_decoder, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -25,6 +25,7 @@ class sgc_decoder(Layer):
         self.kernel = self.add_weight(name='kernel', 
                                       shape=(input_shape[1], self.output_dim),
                                       initializer=self.kernel_initializer,
+                                      regularizer=self.kernel_regularizer,
                                       trainable=True)
         super(sgc_decoder, self).build(input_shape)  # Be sure to call this at the end
 
@@ -46,8 +47,9 @@ class TensorBoardImage(keras.callbacks.Callback):
         
     def on_epoch_end(self, epoch, logs={}):
         decoder_weight = self.model.get_layer('decoder').get_weights()
-        img = tf.squeeze(decoder_weight)
-        #img = tf.nn.softmax(img)
+        img = tf.nn.softmax(decoder_weight)
+        img = tf.squeeze(img)
+        img = tf.math.multiply(img, 10.0)
         shape = K.int_shape(img)
         if(len(shape) == 2):
             img = tf.reshape(img, [1, shape[0], shape[1], 1])

@@ -45,7 +45,7 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     # Consider adding `kernel_regularizer=tf.keras.regularizers.l1()` to below,
     # to encourage sparser (mostly zero) weights for the decoder.
     #decode = tf.keras.layers.Dense(num_nodes, kernel_constraint=tf.keras.constraints.NonNeg(), kernel_regularizer=tf.keras.regularizers.l1(0.00), use_bias=False, name='decoder')(latent)
-    decode = sgc_decoder(num_nodes, name = 'decoder')(latent)
+    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = tf.keras.regularizers.l1(0.00))(latent)
     decode = tf.keras.layers.Reshape((num_nodes, 1))(decode)
     
     model = tf.keras.Model(inputs=(I, A), outputs=decode)
@@ -115,6 +115,12 @@ model.fit(
 
 #model.save(path+'sgc.h5')
 
+e_shape = expected_paths.shape
+e_img = np.reshape(expected_paths, [1, e_shape[0], e_shape[1], 1])
+e_path = os.path.join(log_dir, 'e_paths')
+file_writer = tf.summary.create_file_writer(e_path)
+with file_writer.as_default():
+    tf.summary.image("Expected paths", e_img, step=0, description='expected paths to be learned')
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 print(model.summary())
