@@ -44,7 +44,8 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     
     # Consider adding `kernel_regularizer=tf.keras.regularizers.l1()` to below,
     # to encourage sparser (mostly zero) weights for the decoder.
-    decode = tf.keras.layers.Dense(num_nodes, kernel_constraint=tf.keras.constraints.NonNeg(), kernel_regularizer=tf.keras.regularizers.l1(0.00), use_bias=False, name='decoder')(latent)
+    #decode = tf.keras.layers.Dense(num_nodes, kernel_constraint=tf.keras.constraints.NonNeg(), kernel_regularizer=tf.keras.regularizers.l1(0.00), use_bias=False, name='decoder')(latent)
+    decode = sgc_decoder(num_nodes, name = 'decoder')(latent)
     decode = tf.keras.layers.Reshape((num_nodes, 1))(decode)
     
     model = tf.keras.Model(inputs=(I, A), outputs=decode)
@@ -77,7 +78,7 @@ A = np.tile(np.expand_dims(A, 0), (flows.shape[0], 1, 1))  # Adding a dummy batc
 n_edges = flows.shape[1]
 n_sgc_feats = 32
 n_flows = 5
-n_paths = 2
+n_paths = expected_paths.shape[0]
 
 learning_rate = 0.0003
 batch_size = 32
@@ -97,7 +98,9 @@ model.compile(
 log_dir = './log'
 
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir,  histogram_freq=1)
-tbi_callback = TensorBoardImage('Image Example')
+tbi_callback = TensorBoardImage('Image Example', log_dir = log_dir)
+
+os.system('rm -rf ' + log_dir)
 
 model.fit(
     x={'input_node_features': flows, 'adjacency': A},
@@ -110,30 +113,13 @@ model.fit(
     # saving model to a file via callbacks, etc 
 )
 
-model.save(path+'sgc.h5')
+#model.save(path+'sgc.h5')
 
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 print(model.summary())
 paths = model.get_layer('decoder').get_weights()
 print(paths)
-'''print(paths) # Decoder weights
-print(paths.shape)
-if(not expected_paths is None):
-    for p in paths:
-        loss = -1
-        mp = None
-        mep = None
-        for ep in expected_paths:
-            w =  (p @ ep.T)/(p @ p.T)
-            proj = (w * p)
-            current_loss = npla.norm(proj - ep)/npla.norm(ep)
-            if(loss < 0 or current_loss<loss):
-                loss = current_loss
-                mp = proj
-                mep = ep
-        print(mp)
-        print(mep)
-'''
+print(tf.nn.softmax(paths))
 # To predict after fitting the model:
 #model.predict(x={foobar})
