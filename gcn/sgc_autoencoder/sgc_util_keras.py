@@ -1,4 +1,5 @@
 from tensorflow import keras
+from tensorflow.keras import regularizers
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Layer
 import tensorflow as tf
@@ -27,7 +28,7 @@ class sgc_decoder(Layer):
                                       initializer=self.kernel_initializer,
                                       regularizer=self.kernel_regularizer,
                                       trainable=True)
-        super(sgc_decoder, self).build(input_shape)  # Be sure to call this at the end
+        super(sgc_decoder, self).build(input_shape)  
 
     def call(self, x):
         kern = K.softmax(self.kernel)
@@ -59,6 +60,80 @@ class TensorBoardImage(keras.callbacks.Callback):
         path = os.path.join(self._log_writer_dir, self._train_run_name)
         file_writer = tf.summary.create_file_writer(path)
         with file_writer.as_default():
-            tf.summary.image("Decoder Paths", img, step=0, description='paths generated from softmaxing decoder weights')
+            tf.summary.image("Decoder Paths", img, step=epoch, description='paths generated from softmaxing decoder weights')
 
         return
+
+import time
+
+class l1l2_softmax(regularizers.Regularizer):
+    def __init__(self, l1=0., l2=0.):
+        self.l1 = K.cast_to_floatx(l1)
+        self.l2 = K.cast_to_floatx(l2)
+
+    def __call__(self, x):
+        regularization = 0.
+        if self.l1:
+            regularization += self.l1 * K.sum(K.softmax(x))
+        if self.l2:
+            regularization += self.l2 * K.sum(K.square(K.softmax(x)))
+        return regularization
+
+    def get_config(self):
+        return {'l1': float(self.l1),
+                'l2': float(self.l2)}
+
+class correlation(regularizers.Regularizer):
+    def __init__(self, k = 0.01):
+        self.k = K.cast_to_floatx(k)
+
+    def __call__(self, x):
+        regularization = 0.
+        norm_sm_x = K.l2_normalize(K.softmax(x))
+        corr = K.dot(norm_sm_x, K.transpose(norm_sm_x))
+        for i in range(K.int_shape(corr)[0]):
+            for j in range(K.int_shape(corr)[1]):
+                if(j < i):
+                    regularization += corr[i, j]
+        return regularization
+
+    def get_config(self):
+        return {'k': float(self.k)}
+    
+class TimeHistory(keras.callbacks.Callback):
+    def on_train_begin(self, logs={}):
+        self.times = []
+
+    def on_epoch_begin(self, epoch, logs={}):
+        self.epoch_time_start = time.time()
+
+    def on_epoch_end(self, epoch, logs={}):
+        self.times.append(time.time() - self.epoch_time_start)
+
+
+class l1l2_corr_sm(regularizers.Regularizer):
+    def __init__(self, l1=0., l2=0., k = 0.):
+        self.l1 = K.cast_to_floatx(l1)
+        self.l2 = K.cast_to_floatx(l2)
+        self.k = K.cast_to_floatx(k)
+
+    def __call__(self, x):
+        regularization = 0.
+        sm_x = K.softmax(x)
+        if self.l1:
+            regularization += self.l1 * K.sum(sm_x)
+        if self.l2:
+            regularization += self.l2 * K.sum(K.square(sm_x))
+        if self.k:
+            norm_sm_x = K.l2_normalize(sm_x)
+            corr = K.dot(norm_sm_x, K.transpose(norm_sm_x))
+            for i in range(K.int_shape(corr)[0]):
+                for j in range(K.int_shape(corr)[1]):
+                    if(j < i):
+                        regularization += corr[i, j]
+        return regularization
+
+    def get_config(self):
+        return {'l1': float(self.l1),
+                'l2': float(self.l2),
+                'k' : float(self.k)}

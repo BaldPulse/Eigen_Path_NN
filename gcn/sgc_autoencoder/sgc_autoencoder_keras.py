@@ -45,7 +45,7 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     # Consider adding `kernel_regularizer=tf.keras.regularizers.l1()` to below,
     # to encourage sparser (mostly zero) weights for the decoder.
     #decode = tf.keras.layers.Dense(num_nodes, kernel_constraint=tf.keras.constraints.NonNeg(), kernel_regularizer=tf.keras.regularizers.l1(0.00), use_bias=False, name='decoder')(latent)
-    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = tf.keras.regularizers.l1(0.00))(latent)
+    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = l1l2_corr_sm(l1 = 0.02, l2 = 0., k = 0.5))(latent)
     decode = tf.keras.layers.Reshape((num_nodes, 1))(decode)
     
     model = tf.keras.Model(inputs=(I, A), outputs=decode)
@@ -68,9 +68,12 @@ def load_data(path):
 
 
 
-path = '../data/5/'
+path = '../data/7/'
+val_path = '../data/5_val/'
 flows, noiseless_flows, edge_adj, expected_paths = load_data(path)
+val_flows, val_noiseless_flows, _, _ = load_data(val_path)
 flows = np.expand_dims(flows, 2)
+val_flows = np.expand_dims(val_flows, 2)
 noiseless_flows = np.expand_dims(noiseless_flows, 2)
 A = prepare_adj(edge_adj)
 A = np.tile(np.expand_dims(A, 0), (flows.shape[0], 1, 1))  # Adding a dummy batch dimension
@@ -82,7 +85,7 @@ n_paths = expected_paths.shape[0]
 
 learning_rate = 0.0003
 batch_size = 32
-n_epochs = 200
+n_epochs = 300
 
 model = get_sgc_model(n_edges, 
                       num_sgc_feats=n_sgc_feats, 
@@ -97,23 +100,24 @@ model.compile(
 
 log_dir = './log'
 
-tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir,  histogram_freq=1)
+tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, write_images=False, histogram_freq=1)
 tbi_callback = TensorBoardImage('Image Example', log_dir = log_dir)
+time_callback = TimeHistory()
+
 
 os.system('rm -rf ' + log_dir)
 
 model.fit(
-    x={'input_node_features': flows, 'adjacency': A},
-    y=flows,
+    x={'input_node_features': noiseless_flows, 'adjacency': A},
+    y=noiseless_flows,
     batch_size=batch_size,
     epochs=n_epochs,
-    callbacks=[tensorboard_callback, tbi_callback]
-    # validation data=(x={F, A}, Y=F), to include validation data here, 
+    callbacks=[tensorboard_callback, tbi_callback, time_callback],
+    #validation_data=({'input_node_features': val_flows, 'adjacency': A},val_flows)
     # you could also include logging to a file via callbacks,
     # saving model to a file via callbacks, etc 
 )
 
-#model.save(path+'sgc.h5')
 
 e_shape = expected_paths.shape
 e_img = np.reshape(expected_paths, [1, e_shape[0], e_shape[1], 1])
@@ -127,5 +131,7 @@ print(model.summary())
 paths = model.get_layer('decoder').get_weights()
 print(paths)
 print(tf.nn.softmax(paths))
+#print(np.array(time_callback.times))
+print(np.sum(time_callback.times))
 # To predict after fitting the model:
 #model.predict(x={foobar})
