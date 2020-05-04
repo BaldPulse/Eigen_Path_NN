@@ -6,6 +6,7 @@ import tensorflow as tf
 import skimage
 import numpy as np
 import os
+from datetime import datetime
 
 class sgc_decoder(Layer):
 
@@ -41,9 +42,10 @@ class sgc_decoder(Layer):
 
 class TensorBoardImage(keras.callbacks.Callback):
     def __init__(self, tag, log_dir = './log'):
+        now = datetime.now()
         super().__init__() 
         self.tag = tag
-        self._train_run_name = 'path_image'
+        self._train_run_name = 'path_image' + now.strftime("%H:%M:%S")
         self._log_writer_dir = log_dir
         
     def on_epoch_end(self, epoch, logs={}):
@@ -112,28 +114,33 @@ class TimeHistory(keras.callbacks.Callback):
 
 
 class l1l2_corr_sm(regularizers.Regularizer):
-    def __init__(self, l1=0., l2=0., k = 0.):
+    def __init__(self, l1=0., l2=0., kc = 0., ks = 0.):
         self.l1 = K.cast_to_floatx(l1)
         self.l2 = K.cast_to_floatx(l2)
-        self.k = K.cast_to_floatx(k)
+        self.kc = K.cast_to_floatx(kc)
+        self.ks = K.cast_to_floatx(ks)
 
     def __call__(self, x):
         regularization = 0.
         sm_x = K.softmax(x)
+        #l1 regularization for individual paths
         if self.l1:
-            regularization += self.l1 * K.sum(sm_x)
+            regularization += self.l1 * K.sum(K.abs(x))
         if self.l2:
             regularization += self.l2 * K.sum(K.square(sm_x))
-        if self.k:
+        if self.kc:
             norm_sm_x = K.l2_normalize(sm_x)
             corr = K.dot(norm_sm_x, K.transpose(norm_sm_x))
             for i in range(K.int_shape(corr)[0]):
                 for j in range(K.int_shape(corr)[1]):
                     if(j < i):
-                        regularization += corr[i, j]
+                        regularization += self.kc * corr[i, j]
+        if self.ks:
+            sm_x_std = K.std(sm_x, axis = -1)
+            regularization += K.std(sm_x_std)
         return regularization
 
     def get_config(self):
         return {'l1': float(self.l1),
                 'l2': float(self.l2),
-                'k' : float(self.k)}
+                'k' : float(self.kc)}

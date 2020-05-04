@@ -45,7 +45,7 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     # Consider adding `kernel_regularizer=tf.keras.regularizers.l1()` to below,
     # to encourage sparser (mostly zero) weights for the decoder.
     #decode = tf.keras.layers.Dense(num_nodes, kernel_constraint=tf.keras.constraints.NonNeg(), kernel_regularizer=tf.keras.regularizers.l1(0.00), use_bias=False, name='decoder')(latent)
-    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = l1l2_corr_sm(l1 = 0.02, l2 = 0., k = 0.5))(latent)
+    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.))(latent)
     decode = tf.keras.layers.Reshape((num_nodes, 1))(decode)
     
     model = tf.keras.Model(inputs=(I, A), outputs=decode)
@@ -98,14 +98,14 @@ model.compile(
     # e.g. difference between the decoder weight and ground truth paths.
 )
 
-log_dir = './log'
+log_dir = './logs'
 
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, write_images=False, histogram_freq=1)
 tbi_callback = TensorBoardImage('Image Example', log_dir = log_dir)
 time_callback = TimeHistory()
 
 
-os.system('rm -rf ' + log_dir)
+#os.system('rm -rf ' + log_dir)
 
 model.fit(
     x={'input_node_features': noiseless_flows, 'adjacency': A},
@@ -129,7 +129,7 @@ np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 print(model.summary())
 paths = model.get_layer('decoder').get_weights()
-print(paths)
+#print(paths)
 print(tf.nn.softmax(paths))
 #print(np.array(time_callback.times))
 print(np.sum(time_callback.times))
