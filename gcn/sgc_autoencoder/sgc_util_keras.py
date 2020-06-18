@@ -106,6 +106,12 @@ class TimeHistory(keras.callbacks.Callback):
     def on_train_begin(self, logs={}):
         self.times = []
 
+    def on_batch_end(self, batch, logs=None):
+        loss = logs.get('loss')
+        d_weight = self.model.get_layer('decoder').get_weights()
+        if tf.reduce_any(tf.math.is_nan(d_weight)):
+            tf.print('loss is weird', loss)
+        
     def on_epoch_begin(self, epoch, logs={}):
         self.epoch_time_start = time.time()
 
@@ -114,20 +120,26 @@ class TimeHistory(keras.callbacks.Callback):
 
 
 class l1l2_corr_sm(regularizers.Regularizer):
-    def __init__(self, l1=0., l2=0., kc = 0., ks = 0.):
+    def __init__(self, l1=0., l2=0., kc = 0., ks = 0., kv = 0.):
         self.l1 = K.cast_to_floatx(l1)
         self.l2 = K.cast_to_floatx(l2)
         self.kc = K.cast_to_floatx(kc)
         self.ks = K.cast_to_floatx(ks)
-
+        self.kv = K.cast_to_floatx(kv)
+        
+    @tf.function
     def __call__(self, x):
         regularization = 0.
         sm_x = K.softmax(x)
+        if tf.math.is_nan(x)[0,0]:
+            tf.print('x is nan', x)
         #l1 regularization for individual paths
+        #incentivize paths to be sparse
         if self.l1:
             regularization += self.l1 * K.sum(K.abs(x))
         if self.l2:
             regularization += self.l2 * K.sum(K.square(sm_x))
+        #incentivize paths to be different
         if self.kc:
             norm_sm_x = K.l2_normalize(sm_x)
             corr = K.dot(norm_sm_x, K.transpose(norm_sm_x))
@@ -135,9 +147,14 @@ class l1l2_corr_sm(regularizers.Regularizer):
                 for j in range(K.int_shape(corr)[1]):
                     if(j < i):
                         regularization += self.kc * corr[i, j]
+        #incentivize paths to be similar in sparsity
         if self.ks:
-            sm_x_std = K.std(sm_x, axis = -1)
-            regularization += K.std(sm_x_std)
+            sm_x_std = K.var(sm_x, axis = -1)
+            std = K.var(sm_x_std)
+            regularization += std
+        if self.kv:
+            sm_x_std = K.var(sm_x, axis = -1)
+            regularization += K.sum(sm_x_std)
         return regularization
 
     def get_config(self):
