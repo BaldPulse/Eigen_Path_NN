@@ -38,7 +38,10 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     sgc_out = tf.keras.layers.ReLU()(sgc_out)
     sgc_out = tf.keras.layers.Flatten()(sgc_out)  # Shape: [num_nodes*num_sgc_feats]
     
-    latent = tf.keras.layers.Dense(latent_size, activation='relu', name='bottleneck')(sgc_out)
+    latent = tf.keras.layers.Dense(latent_size,
+                                   activation='relu',
+                                   kernel_initializer=tf.keras.initializers.RandomUniform(minval=0., maxval=1.),
+                                   name='bottleneck')(sgc_out)
 
     
     # Consider adding `kernel_regularizer=tf.keras.regularizers.l1()` to below,
