@@ -119,6 +119,12 @@ class TimeHistory(keras.callbacks.Callback):
         self.times.append(time.time() - self.epoch_time_start)
 
 
+class Bottleneck_input_weights(keras.callbacks.Callback):
+    def on_epoch_end(self, epoch, logs={}):
+        bweight = self.model.get_layer('bottleneck').get_weights()
+        bweight_sum = K.sum(bweight[0], axis=0)
+        print(bweight_sum)
+
 class EarlyStoppingByLossVal(keras.callbacks.Callback):
     def __init__(self, monitor='val_loss', value=0.00001, verbose=0):
         super(keras.callbacks.Callback, self).__init__()
@@ -171,10 +177,61 @@ class l1l2_corr_sm(regularizers.Regularizer):
             regularization += std
         if self.kv:
             sm_x_std = K.var(sm_x, axis = -1)
-            regularization += K.sum(sm_x_std)
+            regularization -= K.sum(sm_x_std)
         return regularization
 
     def get_config(self):
         return {'l1': float(self.l1),
                 'l2': float(self.l2),
                 'k' : float(self.kc)}
+
+
+def weighted_jaccard(a, b):
+    a_pad = a
+    b_pad = b
+    #pad
+    if b.shape[0] > a.shape[0]:
+        N = b.shape[0] - a.shape[0]
+        a_pad = np.pad(a, (0,N), 'constant')
+    elif a.shape[0] > b.shape[0]:
+        N = a.shape[0] - b.shape[0]
+        b_pad = np.pad(b, (0,N), 'constant')
+    return (2-np.sum(np.absolute(a_pad-b_pad)))/(2+np.sum(np.absolute(a_pad-b_pad)))
+
+
+def jaccard_multiset(s, m):
+    vm = np.zeros(s.shape[0])
+    vs = np.ones(s.shape[0])
+    for learned_path in m:
+        max_sim = -1
+        max_i = -1
+        for i in range(s.shape[0]):
+            sim = weighted_jaccard(learned_path, s[i])
+            if sim>max_sim:
+                max_sim = sim
+                max_i = i
+        vm[max_i] += max_sim
+    print(vm, vs)
+    return weighted_jaccard(vm, vs)
+
+
+def evaluate_path_similarities(epath, lpath):
+    return jaccard_multiset(epath, lpath)
+
+def l1_normalize(A):
+    return A / np.sum(np.absolute(A), axis=1).reshape(A.shape[0],1)
+
+if __name__ == "__main__":
+    t0 = np.array([[1,2,3,1],
+                   [2,0,0,1]])
+    t0 = t0 / np.sum(np.absolute(t0), axis=1).reshape(t0.shape[0],1)
+    t1 = np.array([[1,2,3,0],
+                   [1,0,0,1]])
+    t1 = t1 / np.sum(np.absolute(t1), axis=1).reshape(t1.shape[0],1)
+    #print(t0, t0,weighted_jaccard(t0, t0))
+    #print(t0, t1,weighted_jaccard(t0, t1))
+    print(t0, t1)
+    print(jaccard_multiset(t0, t1))
+    #print(weighted_jaccard([1,2,3,1], [1,2,3,0]))
+    #print(weighted_jaccard([1,2,3,1], [2,0,0,1]))
+    #print(weighted_jaccard([1,0,0,1], [2,0,0,1]))

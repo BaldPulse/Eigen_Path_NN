@@ -45,7 +45,7 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
                                    kernel_initializer=tf.keras.initializers.RandomUniform(minval=0., maxval=1.),
                                    name='bottleneck')(sgc_out)
 
-    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 1.5, ks = 0.2, kv = 0.2))(latent)
+    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.5, ks = 0.2, kv = 0.2))(latent)
     decode = tf.keras.layers.Reshape((num_nodes, 1))(decode)
     
     model = tf.keras.Model(inputs=(I, A), outputs=decode)
@@ -78,6 +78,7 @@ _log_dir = './logs'
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=_log_dir, write_images=False, histogram_freq=1)
 tbi_callback = TensorBoardImage('Image Example', log_dir = _log_dir)
 earlystop_callback = EarlyStoppingByLossVal(monitor='loss', value=3, verbose=0)
+biw_callback = Bottleneck_input_weights()
 time_callback = TimeHistory()
 
 path = '../data/7/'
@@ -148,14 +149,20 @@ with file_writer.as_default():
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 print(model.summary())
-paths = model.get_layer('decoder').get_weights()
+weights = model.get_layer('decoder').get_weights()
+paths = tf.nn.softmax(weights[0])
 now = datetime.now()
 l_shape = paths[0].shape
-l_img = np.reshape(tf.nn.softmax(paths[0])*10, [1, n_paths, e_shape[1], 1])
+l_img = np.reshape(paths*10, [1, n_paths, e_shape[1], 1])
 l_path = os.path.join(_log_dir, now.strftime("%H:%M:%S"))
 file_writer = tf.summary.create_file_writer(l_path)
 with file_writer.as_default():
     tf.summary.image("Learned paths", l_img, step=0, description='Learned paths from decoder')
-print(tf.nn.softmax(paths))
+print(paths)
+l1_epath = l1_normalize(expected_paths)
+#print(l1_epath)
+sim = evaluate_path_similarities(l1_epath, paths.numpy())
+print(sim)
+
 # To predict after fitting the model:
 #model.predict(x={foobar})
