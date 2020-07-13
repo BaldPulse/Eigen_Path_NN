@@ -81,7 +81,7 @@ earlystop_callback = EarlyStoppingByLossVal(monitor='loss', value=3, verbose=0)
 biw_callback = Bottleneck_input_weights()
 time_callback = TimeHistory()
 
-path = '../data/7/'
+path = '../data/baseline/'
 
 _callbacks = []
 use_noiseless = False
