@@ -66,12 +66,22 @@ def load_data(path):
         print('no noiseless flows in'+path)
     return flows, noiseless_flows, edge_adj, expected_paths
 
-optlist, args = getopt.getopt(sys.argv[1:], 'n:p:', ['noiseless', 'data='])
+def create_profusion(pure0, pure1, mixed, mixed_portion):
+    print('pure0', pure0.shape)
+    total = 2000
+    mixed_num = int(total * mixed_portion)
+    pure_num = int((total - mixed_num)/2)
+    #print(np.random.choice(pure0.shape[0], size=pure_num, replace=False))
+    sample = np.append(pure0[np.random.choice(pure0.shape[0], size=pure_num, replace=False)],\
+                       mixed[np.random.choice(mixed.shape[0], size=mixed_num, replace=False)], axis=0)
+    sample = np.append(pure1[np.random.choice(pure1.shape[0], size=pure_num, replace=False)], sample, axis=0)
+    return sample
+
+optlist, args = getopt.getopt(sys.argv[1:], 'n:p:', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mix'])
 
 learning_rate = 0.0003
 batch_size = 32
 n_epochs = 300
-
 
 _log_dir = './logs'
 
@@ -83,14 +93,20 @@ time_callback = TimeHistory()
 
 path = '../data/baseline/'
 
+
+
+
 _callbacks = []
 use_noiseless = False
+use_profusion = False
 _npath = -1
 for a,o in optlist:
     if a=="-n":
         n_epochs=int(o)
     if a=='--noiseless':
         use_noiseless = True
+    if a=='--mix':
+        use_profusion = True
     if a=='--data':
         path=o
     if a=='--tensorboard':
@@ -108,6 +124,16 @@ noiseless_flows = np.expand_dims(noiseless_flows, 2)
 A = prepare_adj(edge_adj)
 A = np.tile(np.expand_dims(A, 0), (flows.shape[0], 1, 1))  # Adding a dummy batch dimension
 
+mixed_path = '../data/baseline_mixed/'
+m_flows, m_noiseless_flows, edge_adj, expected_paths = load_data(mixed_path)
+pure0_path = '../data/baseline_pure0/'
+p0_flows, p0_noiseless_flows, edge_adj, p0_expected_paths = load_data(pure0_path)
+pure1_path = '../data/baseline_pure1/'
+p1_flows, p1_noiseless_flows, edge_adj, p1_expected_paths = load_data(pure1_path)
+
+if use_profusion:
+    flows = create_profusion(p0_flows, p1_flows, m_flows, mixed_proportion)
+    noiseless_flows = create_profusion(p0_noiseless_flows, p1_noiseless_flows, m_noiseless_flows, mixed_proportion)
 
 n_edges = flows.shape[1]
 n_sgc_feats = 32
