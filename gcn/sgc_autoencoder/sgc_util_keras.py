@@ -32,7 +32,7 @@ class sgc_decoder(Layer):
         super(sgc_decoder, self).build(input_shape)  
 
     def call(self, x):
-        kern = K.softmax(self.kernel)
+        kern = K.sigmoid(5*self.kernel)
         return K.dot(x, kern)
         #return K.dot(x, self.kernel)
 
@@ -153,7 +153,7 @@ class l1l2_corr_sm(regularizers.Regularizer):
     @tf.function
     def __call__(self, x):
         regularization = 0.
-        sm_x = K.softmax(x)
+        sig_x = K.sigmoid(x*5)
         if tf.math.is_nan(x)[0,0]:
             tf.print('x is nan', x)
         #l1 regularization for individual paths
@@ -161,23 +161,23 @@ class l1l2_corr_sm(regularizers.Regularizer):
         if self.l1:
             regularization += self.l1 * K.sum(K.abs(x))
         if self.l2:
-            regularization += self.l2 * K.sum(K.square(sm_x))
+            regularization += self.l2 * K.sum(K.square(sig_x))
         #incentivize paths to be different
         if self.kc:
-            norm_sm_x = K.l2_normalize(sm_x)
-            corr = K.dot(norm_sm_x, K.transpose(norm_sm_x))
+            norm_sig_x = K.l2_normalize(sig_x)
+            corr = K.dot(norm_sig_x, K.transpose(norm_sig_x))
             for i in range(K.int_shape(corr)[0]):
                 for j in range(K.int_shape(corr)[1]):
                     if(j < i):
                         regularization += self.kc * corr[i, j]
         #incentivize paths to be similar in sparsity
         if self.ks:
-            sm_x_std = K.var(sm_x, axis = -1)
-            std = K.var(sm_x_std)
+            sig_x_std = K.var(sig_x, axis = -1)
+            std = K.var(sig_x_std)
             regularization += std
         if self.kv:
-            sm_x_std = K.var(sm_x, axis = -1)
-            regularization -= K.sum(sm_x_std)
+            sig_x_std = K.var(sig_x, axis = -1)
+            regularization -= K.sum(sig_x_std)
         return regularization
 
     def get_config(self):

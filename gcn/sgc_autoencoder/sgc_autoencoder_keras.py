@@ -42,10 +42,10 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     latent = tf.keras.layers.Dense(latent_size,
                                    activation='relu',
                                    #kernel_initializer=tf.keras.initializers.GlorotNormal(seed=None),
-                                   kernel_initializer=tf.keras.initializers.RandomUniform(minval=0., maxval=1.),
+                                   #kernel_initializer=tf.keras.initializers.RandomUniform(minval=0., maxval=1.),
                                    name='bottleneck')(sgc_out)
 
-    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.5, ks = 0.2, kv = 0.2))(latent)
+    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.5, ks = 0.4, kv = 0.0))(latent)
     decode = tf.keras.layers.Reshape((num_nodes, 1))(decode)
     
     model = tf.keras.Model(inputs=(I, A), outputs=decode)
@@ -150,16 +150,16 @@ np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 print(model.summary())
 weights = model.get_layer('decoder').get_weights()
-paths = tf.nn.softmax(weights[0])
+paths = tf.keras.backend.sigmoid(weights[0]*5)
 now = datetime.now()
 l_shape = paths[0].shape
-l_img = np.reshape(paths*10, [1, n_paths, e_shape[1], 1])
+l_img = np.reshape(paths, [1, n_paths, e_shape[1], 1])
 l_path = os.path.join(_log_dir, now.strftime("%H:%M:%S"))
 file_writer = tf.summary.create_file_writer(l_path)
 with file_writer.as_default():
     tf.summary.image("Learned paths", l_img, step=0, description='Learned paths from decoder')
 print(paths)
-l1_epath = l1_normalize(expected_paths)
+l1_epath = expected_paths
 #print(l1_epath)
 sim = evaluate_path_similarities(l1_epath, paths.numpy())
 print(sim)
