@@ -42,10 +42,10 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     latent = tf.keras.layers.Dense(latent_size,
                                    activation='relu',
                                    #kernel_initializer=tf.keras.initializers.GlorotNormal(seed=None),
-                                   #kernel_initializer=tf.keras.initializers.RandomUniform(minval=0., maxval=1.),
+                                   kernel_initializer=tf.keras.initializers.RandomUniform(minval=0., maxval=1.),
                                    name='bottleneck')(sgc_out)
 
-    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.5, ks = 0.4, kv = 0.0))(latent)
+    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.2, ks = 0.4, kv = 0.0))(latent)
     decode = tf.keras.layers.Reshape((num_nodes, 1))(decode)
     
     model = tf.keras.Model(inputs=(I, A), outputs=decode)
@@ -77,7 +77,7 @@ def create_profusion(pure0, pure1, mixed, mixed_portion):
     sample = np.append(pure1[np.random.choice(pure1.shape[0], size=pure_num, replace=False)], sample, axis=0)
     return sample
 
-optlist, args = getopt.getopt(sys.argv[1:], 'n:p:', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mix'])
+optlist, args = getopt.getopt(sys.argv[1:], 'n:p:', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed='])
 
 learning_rate = 0.0003
 batch_size = 32
@@ -99,16 +99,19 @@ path = '../data/baseline/'
 _callbacks = []
 use_noiseless = False
 use_profusion = False
+mixed_proportion = 0
 _npath = -1
 for a,o in optlist:
     if a=="-n":
         n_epochs=int(o)
     if a=='--noiseless':
         use_noiseless = True
-    if a=='--mix':
+    if a=='--mixed':
         use_profusion = True
+        print('mixed proportion', o)
+        mixed_proportion = float(o)
     if a=='--data':
-        path=o
+        path='../data/'+o
     if a=='--tensorboard':
         _callback.append(tensorboard_callback)
     if a=='--tbi':
@@ -124,14 +127,13 @@ noiseless_flows = np.expand_dims(noiseless_flows, 2)
 A = prepare_adj(edge_adj)
 A = np.tile(np.expand_dims(A, 0), (flows.shape[0], 1, 1))  # Adding a dummy batch dimension
 
-mixed_path = '../data/baseline_mixed/'
-m_flows, m_noiseless_flows, edge_adj, expected_paths = load_data(mixed_path)
-pure0_path = '../data/baseline_pure0/'
-p0_flows, p0_noiseless_flows, edge_adj, p0_expected_paths = load_data(pure0_path)
-pure1_path = '../data/baseline_pure1/'
-p1_flows, p1_noiseless_flows, edge_adj, p1_expected_paths = load_data(pure1_path)
-
 if use_profusion:
+    mixed_path = '../data/baseline_mixed/'
+    m_flows, m_noiseless_flows, edge_adj, expected_paths = load_data(mixed_path)
+    pure0_path = '../data/baseline_pure0/'
+    p0_flows, p0_noiseless_flows, edge_adj, p0_expected_paths = load_data(pure0_path)
+    pure1_path = '../data/baseline_pure1/'
+    p1_flows, p1_noiseless_flows, edge_adj, p1_expected_paths = load_data(pure1_path)
     flows = create_profusion(p0_flows, p1_flows, m_flows, mixed_proportion)
     noiseless_flows = create_profusion(p0_noiseless_flows, p1_noiseless_flows, m_noiseless_flows, mixed_proportion)
 
