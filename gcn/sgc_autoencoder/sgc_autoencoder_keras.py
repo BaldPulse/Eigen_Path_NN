@@ -6,7 +6,9 @@ import tensorflow as tf
 import numpy as np
 import numpy.linalg as npla
 import sys, getopt
-from sgc_util_keras import *
+from sgc_layer_utils import *
+from sgc_callbacks import *
+
 
 def prepare_adj(adj):
     I = np.identity(adj.shape[0])
@@ -45,7 +47,12 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
                                    kernel_initializer=tf.keras.initializers.RandomUniform(minval=0., maxval=1.),
                                    name='bottleneck')(sgc_out)
 
-    decode = sgc_decoder(num_nodes, name = 'decoder', kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.2, ks = 0.4, kv = 0.0))(latent)
+    decode = sgc_decoder(num_nodes,
+                         name = 'decoder',
+                         kernel_constraint = clip_weights(),
+                         kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.2, ks = 0.4, kv = 0.0),
+                         #kernel_regularizer = soft_binarize(0.0),
+                         )(latent)
     decode = tf.keras.layers.Reshape((num_nodes, 1))(decode)
     
     model = tf.keras.Model(inputs=(I, A), outputs=decode)
@@ -77,7 +84,7 @@ def create_profusion(pure0, pure1, mixed, mixed_portion):
     sample = np.append(pure1[np.random.choice(pure1.shape[0], size=pure_num, replace=False)], sample, axis=0)
     return sample
 
-optlist, args = getopt.getopt(sys.argv[1:], 'n:p:', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed='])
+optlist, args = getopt.getopt(sys.argv[1:], 'n:p:', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'printdweight'])
 
 learning_rate = 0.0003
 batch_size = 32
@@ -89,6 +96,7 @@ tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=_log_dir, write_im
 tbi_callback = TensorBoardImage('Image Example', log_dir = _log_dir)
 earlystop_callback = EarlyStoppingByLossVal(monitor='loss', value=3, verbose=0)
 biw_callback = Bottleneck_input_weights()
+dw_callback = Decoder_weights()
 time_callback = TimeHistory()
 
 path = '../data/baseline/'
@@ -113,11 +121,13 @@ for a,o in optlist:
     if a=='--data':
         path='../data/'+o
     if a=='--tensorboard':
-        _callback.append(tensorboard_callback)
+        _callbacks.append(tensorboard_callback)
     if a=='--tbi':
-        _callback.append(tbi_callback)
+        _callbacks.append(tbi_callback)
     if a=='--earlystop':
-        _callback.append(earlystop_callback)
+        _callbacks.append(earlystop_callback)
+    if a=='--printdweight':
+        _callbacks.append(dw_callback)
     if a=='-p':
         _npath = int(o)
 
@@ -178,7 +188,7 @@ np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 print(model.summary())
 weights = model.get_layer('decoder').get_weights()
-paths = tf.keras.backend.sigmoid(weights[0]*5)
+paths = weights[0] * 5
 now = datetime.now()
 l_shape = paths[0].shape
 l_img = np.reshape(paths, [1, n_paths, e_shape[1], 1])
@@ -187,10 +197,11 @@ file_writer = tf.summary.create_file_writer(l_path)
 with file_writer.as_default():
     tf.summary.image("Learned paths", l_img, step=0, description='Learned paths from decoder')
 print(paths)
+#print(weights[0])
 l1_epath = expected_paths
 #print(l1_epath)
-sim = evaluate_path_similarities(l1_epath, paths.numpy())
-print(sim)
+#sim = evaluate_path_similarities(l1_epath, paths.numpy())
+#print(sim)
 
 # To predict after fitting the model:
 #model.predict(x={foobar})

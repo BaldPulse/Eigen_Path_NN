@@ -1,7 +1,9 @@
 from tensorflow import keras
 from tensorflow.keras import regularizers
+from tensorflow.keras.constraints import Constraint
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Layer
+from tensorflow.python.ops import math_ops
 import tensorflow as tf
 import skimage
 import numpy as np
@@ -15,11 +17,13 @@ class sgc_decoder(Layer):
                  activation=None,                 
                  kernel_initializer='glorot_uniform',
                  kernel_regularizer=None,
+                 kernel_constraint=None,
                  **kwargs):
         self.output_dim = output_dim
         self.activation = keras.activations.get(activation)
         self.kernel_initializer = keras.initializers.get(kernel_initializer)
         self.kernel_regularizer = keras.regularizers.get(kernel_regularizer)
+        self.kernel_constraint = keras.constraints.get(kernel_constraint)
         super(sgc_decoder, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -28,43 +32,16 @@ class sgc_decoder(Layer):
                                       shape=(input_shape[1], self.output_dim),
                                       initializer=self.kernel_initializer,
                                       regularizer=self.kernel_regularizer,
+                                      constraint=self.kernel_constraint,
                                       trainable=True)
-        super(sgc_decoder, self).build(input_shape)  
+        super(sgc_decoder, self).build(input_shape)
 
     def call(self, x):
-        kern = K.sigmoid(5*self.kernel)
-        return K.dot(x, kern)
-        #return K.dot(x, self.kernel)
+        return K.dot(x, self.kernel)
 
     def compute_output_shape(self, input_shape):
         return (input_shape[0], self.output_dim)
 
-
-class TensorBoardImage(keras.callbacks.Callback):
-    def __init__(self, tag, log_dir = './log'):
-        now = datetime.now()
-        super().__init__() 
-        self.tag = tag
-        self._train_run_name = 'path_image' + now.strftime("%H:%M:%S")
-        self._log_writer_dir = log_dir
-        
-    def on_epoch_end(self, epoch, logs={}):
-        decoder_weight = self.model.get_layer('decoder').get_weights()
-        img = tf.nn.softmax(decoder_weight)
-        img = tf.squeeze(img)
-        img = tf.math.multiply(img, 10.0)
-        shape = K.int_shape(img)
-        if(len(shape) == 2):
-            img = tf.reshape(img, [1, shape[0], shape[1], 1])
-        elif(len(shape) == 1):
-            img = tf.reshape(img, [1, 1, shape[0], 1])
-            
-        path = os.path.join(self._log_writer_dir, self._train_run_name)
-        file_writer = tf.summary.create_file_writer(path)
-        with file_writer.as_default():
-            tf.summary.image("Decoder Paths", img, step=epoch, description='paths generated from softmaxing decoder weights')
-
-        return
 
 import time
 
@@ -102,45 +79,6 @@ class correlation(regularizers.Regularizer):
     def get_config(self):
         return {'k': float(self.k)}
     
-class TimeHistory(keras.callbacks.Callback):
-    def on_train_begin(self, logs={}):
-        self.times = []
-
-    def on_batch_end(self, batch, logs=None):
-        loss = logs.get('loss')
-        d_weight = self.model.get_layer('decoder').get_weights()
-        if tf.reduce_any(tf.math.is_nan(d_weight)):
-            tf.print('loss is weird', loss)
-        
-    def on_epoch_begin(self, epoch, logs={}):
-        self.epoch_time_start = time.time()
-
-    def on_epoch_end(self, epoch, logs={}):
-        self.times.append(time.time() - self.epoch_time_start)
-
-
-class Bottleneck_input_weights(keras.callbacks.Callback):
-    def on_epoch_end(self, epoch, logs={}):
-        bweight = self.model.get_layer('bottleneck').get_weights()
-        bweight_sum = K.sum(bweight[0], axis=0)
-        print(bweight_sum)
-
-class EarlyStoppingByLossVal(keras.callbacks.Callback):
-    def __init__(self, monitor='val_loss', value=0.00001, verbose=0):
-        super(keras.callbacks.Callback, self).__init__()
-        self.monitor = monitor
-        self.value = value
-        self.verbose = verbose
-
-    def on_epoch_end(self, epoch, logs={}):
-        current = logs.get(self.monitor)
-        if current is None:
-            print("Early stopping requires %s available!" % self.monitor)
-
-        if current < self.value:
-            if self.verbose > 0:
-                print("Epoch %05d: early stopping THR" % epoch)
-            self.model.stop_training = True
 
 class l1l2_corr_sm(regularizers.Regularizer):
     def __init__(self, l1=0., l2=0., kc = 0., ks = 0., kv = 0.):
@@ -153,7 +91,7 @@ class l1l2_corr_sm(regularizers.Regularizer):
     @tf.function
     def __call__(self, x):
         regularization = 0.
-        sig_x = K.sigmoid(x*5)
+        sig_x = x#K.sigmoid(x*5)
         if tf.math.is_nan(x)[0,0]:
             tf.print('x is nan', x)
         #l1 regularization for individual paths
@@ -179,13 +117,37 @@ class l1l2_corr_sm(regularizers.Regularizer):
             sig_x_std = K.var(sig_x, axis = -1)
             regularization -= K.sum(sig_x_std)
         return regularization
-
+    
     def get_config(self):
         return {'l1': float(self.l1),
                 'l2': float(self.l2),
                 'k' : float(self.kc)}
 
+class soft_binarize(regularizers.Regularizer):
+    def __init__(self, k):
+        self.k = k
+        
+    def __call__(self, x):
+        reg_0 = math_ops.reduce_sum(math_ops.square(x))
+        reg_1 = math_ops.reduce_sum(math_ops.square(x-1))
+        return self.k * K.minimum(reg_0, reg_1)
+        #return self.k * reg_1
 
+class clip_weights(Constraint):
+    '''Clips the weights incident to each hidden unit to be inside a range
+    '''
+    def __init__(self, upper = 1.0, lower = 0.0):
+        self.upper = upper
+        self.lower = lower
+
+    def __call__(self, p):
+        return K.clip(p, self.lower, self.upper)
+
+    def get_config(self):
+        return {'name': self.__class__.__name__,
+                'upper': self.upper,
+                'lower': self.lower}
+    
 def weighted_jaccard(a, b):
     a_pad = a
     b_pad = b
