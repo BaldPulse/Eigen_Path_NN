@@ -147,6 +147,12 @@ class clip_weights(Constraint):
         return {'name': self.__class__.__name__,
                 'upper': self.upper,
                 'lower': self.lower}
+
+def mean_pred(y_true, y_pred):
+    return K.mean(y_pred)
+    
+def dummy_loss(y_true, y_pred):
+    return 0
     
 def weighted_jaccard(a, b):
     a_pad = a

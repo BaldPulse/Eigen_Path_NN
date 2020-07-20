@@ -50,12 +50,12 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     decode = sgc_decoder(num_nodes,
                          name = 'decoder',
                          kernel_constraint = clip_weights(),
-                         kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.0, ks = 0.4, kv = 0.0),
+                         kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.0, ks = 0., kv = 0.0),
                          #kernel_regularizer = soft_binarize(0.0),
                          )(latent)
     decode = tf.keras.layers.Reshape((num_nodes, 1))(decode)
     
-    model = tf.keras.Model(inputs=(I, A), outputs=decode)
+    model = tf.keras.Model(inputs=(I, A), outputs=[decode, latent])
     return model
 
 def load_data(path):
@@ -86,7 +86,7 @@ def create_profusion(pure0, pure1, mixed, mixed_portion):
 
 optlist, args = getopt.getopt(sys.argv[1:], 'n:p:', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'printdweight'])
 
-learning_rate = 0.0003
+learning_rate = 0.00002
 batch_size = 32
 n_epochs = 300
 
@@ -164,7 +164,8 @@ model = get_sgc_model(n_edges,
 
 model.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-    loss=tf.keras.losses.MSE,
+    loss=[tf.keras.losses.MSE, None],
+    metrics={'bottleneck': mean_pred}
 )
 
 
@@ -188,7 +189,7 @@ np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 print(model.summary())
 weights = model.get_layer('decoder').get_weights()
-paths = weights[0] * 5
+paths = weights[0]
 now = datetime.now()
 l_shape = paths[0].shape
 l_img = np.reshape(paths, [1, n_paths, e_shape[1], 1])
