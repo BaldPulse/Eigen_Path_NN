@@ -1,6 +1,6 @@
 import os
 # This disables my GPU.
-#os.environ["CUDA_VISIBLE_DEVICES"]=""
+os.environ["CUDA_VISIBLE_DEVICES"]=""
 
 import tensorflow as tf
 import numpy as np
@@ -84,7 +84,7 @@ def create_profusion(pure0, pure1, mixed, mixed_portion):
     sample = np.append(pure1[np.random.choice(pure1.shape[0], size=pure_num, replace=False)], sample, axis=0)
     return sample
 
-optlist, args = getopt.getopt(sys.argv[1:], 'n:p:', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'printdweight'])
+optlist, args = getopt.getopt(sys.argv[1:], 'n:p:h', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'printdweight', 'cpu'])
 
 learning_rate = 0.00002
 batch_size = 32
@@ -92,6 +92,7 @@ n_epochs = 300
 
 _log_dir = './logs'
 
+reduceLR_callback = tf.keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=50,)
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=_log_dir, write_images=False, histogram_freq=1)
 tbi_callback = TensorBoardImage('Image Example', log_dir = _log_dir)
 earlystop_callback = EarlyStoppingByLossVal(monitor='loss', value=3, verbose=0)
@@ -104,7 +105,7 @@ path = '../data/baseline/'
 
 
 
-_callbacks = []
+_callbacks = [reduceLR_callback]
 use_noiseless = False
 use_profusion = False
 mixed_proportion = 0
@@ -128,8 +129,14 @@ for a,o in optlist:
         _callbacks.append(earlystop_callback)
     if a=='--printdweight':
         _callbacks.append(dw_callback)
+    if a=='--cpu':        
+        # This disables my GPU.
+        os.environ["CUDA_VISIBLE_DEVICES"]=""
     if a=='-p':
         _npath = int(o)
+    if a=='-h':
+        print(['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'printdweight', 'cpu'])
+        sys.exit()
 
 flows, noiseless_flows, edge_adj, expected_paths = load_data(path)
 flows = np.expand_dims(flows, 2)
@@ -163,15 +170,17 @@ model = get_sgc_model(n_edges,
                       latent_size=n_paths)
 
 model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+    #optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+    optimizer=tf.keras.optimizers.SGD(learning_rate=learning_rate),
     loss=[tf.keras.losses.MSE, None],
-    metrics={'bottleneck': mean_pred}
+    #metrics={'bottleneck': mean_pred}
 )
 
 
 model.fit(
     x={'input_node_features': _flows, 'adjacency': A},
     y= _flows,
+    validation_split = 0.3,
     batch_size=batch_size,
     epochs=n_epochs,
     callbacks=_callbacks
