@@ -37,7 +37,7 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     I = tf.keras.Input((num_nodes, 1), name='input_node_features')
     A = tf.keras.Input((num_nodes, num_nodes), name='adjacency')
     
-    sgc_out = sgc_layer(I, A, featsize=num_sgc_feats, numhop=4)  # Shape: [num_nodes, num_sgc_feats]
+    sgc_out = sgc_layer(I, A, featsize=num_sgc_feats, numhop=3)  # Shape: [num_nodes, num_sgc_feats]
     sgc_out = tf.keras.layers.ReLU()(sgc_out)
     sgc_out = tf.keras.layers.Flatten()(sgc_out)  # Shape: [num_nodes*num_sgc_feats]
     
@@ -105,7 +105,7 @@ path = '../data/baseline/'
 
 
 
-_callbacks = [reduceLR_callback]
+_callbacks = []#[reduceLR_callback]
 use_noiseless = False
 use_profusion = False
 mixed_proportion = 0
@@ -170,8 +170,8 @@ model = get_sgc_model(n_edges,
                       latent_size=n_paths)
 
 model.compile(
-    #optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-    optimizer=tf.keras.optimizers.SGD(learning_rate=learning_rate),
+    optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+    #optimizer=tf.keras.optimizers.SGD(learning_rate=learning_rate),
     loss=[tf.keras.losses.MSE, None],
     #metrics={'bottleneck': mean_pred}
 )
