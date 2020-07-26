@@ -37,14 +37,16 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     I = tf.keras.Input((num_nodes, 1), name='input_node_features')
     A = tf.keras.Input((num_nodes, num_nodes), name='adjacency')
     
-    sgc_out = sgc_layer(I, A, featsize=num_sgc_feats, numhop=3)  # Shape: [num_nodes, num_sgc_feats]
+    sgc_out = sgc_layer(I, A, featsize=num_sgc_feats, numhop=4)  # Shape: [num_nodes, num_sgc_feats]
     sgc_out = tf.keras.layers.ReLU()(sgc_out)
+    sgc_out = tf.keras.layers.concatenate([sgc_out, I], axis=-1)
     sgc_out = tf.keras.layers.Flatten()(sgc_out)  # Shape: [num_nodes*num_sgc_feats]
     
     latent = tf.keras.layers.Dense(latent_size,
                                    activation='relu',
                                    #kernel_initializer=tf.keras.initializers.GlorotNormal(seed=None),
                                    kernel_initializer=tf.keras.initializers.RandomUniform(minval=0., maxval=1.),
+                                   kernel_regularizer = tf.keras.regularizers.l2(l=0.01),
                                    name='bottleneck')(sgc_out)
 
     decode = sgc_decoder(num_nodes,
