@@ -57,20 +57,11 @@ class Decoder_weights(keras.callbacks.Callback):
         dweight = self.model.get_layer('bottleneck').get_weights()
         print(dweight)
 
-logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-file_writer = tf.summary.create_file_writer(logdir + "/metrics")
-file_writer.set_as_default()
-        
 class Bottleneck_input_weights(keras.callbacks.Callback):
-    def __init__(self, print_weights = False):
-        self.p = print_weights
-        
     def on_epoch_end(self, epoch, logs={}):
         bweight = self.model.get_layer('bottleneck').get_weights()
         bweight_sum = K.sum(bweight[0], axis=0)
-        tf.summary.scalar('bottleneck weights', data=K.mean(bweight_sum), step=epoch)
-        if self.p:
-            print(bweight_sum)
+        print(bweight_sum)
 
 class EarlyStoppingByLossVal(keras.callbacks.Callback):
     def __init__(self, monitor='val_loss', value=0.00001, verbose=0):
