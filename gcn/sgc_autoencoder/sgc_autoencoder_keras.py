@@ -1,6 +1,6 @@
 import os
 # This disables my GPU.
-os.environ["CUDA_VISIBLE_DEVICES"]=""
+#os.environ["CUDA_VISIBLE_DEVICES"]=""
 
 import tensorflow as tf
 import numpy as np
@@ -86,13 +86,15 @@ def create_profusion(pure0, pure1, mixed, mixed_portion):
     sample = np.append(pure1[np.random.choice(pure1.shape[0], size=pure_num, replace=False)], sample, axis=0)
     return sample
 
-optlist, args = getopt.getopt(sys.argv[1:], 'n:p:h', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'printdweight', 'cpu'])
+optlist, args = getopt.getopt(sys.argv[1:], 'n:p:h', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'printdweight', 'cpu', 'logbweight=', ''])
 
-learning_rate = 0.00002
+learning_rate = 0.00008
 batch_size = 32
 n_epochs = 300
 
-_log_dir = './logs'
+_log_dir = "logs/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+
+file_writer = tf.summary.create_file_writer(_log_dir)
 
 reduceLR_callback = tf.keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=50,)
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=_log_dir, write_images=False, histogram_freq=1)
@@ -111,6 +113,7 @@ _callbacks = []#[reduceLR_callback]
 use_noiseless = False
 use_profusion = False
 mixed_proportion = 0
+validation_prop = 0.0
 _npath = -1
 for a,o in optlist:
     if a=="-n":
@@ -126,18 +129,23 @@ for a,o in optlist:
     if a=='--tensorboard':
         _callbacks.append(tensorboard_callback)
     if a=='--tbi':
-        _callbacks.append(tbi_callback)
+        _callbacks.append(tbi_callback)  
     if a=='--earlystop':
         _callbacks.append(earlystop_callback)
     if a=='--printdweight':
         _callbacks.append(dw_callback)
+    if a=='--logbweight':
+        print('biw logging enabled')
+        if o == 'p':
+            biw_callback = Bottleneck_input_weights(print_weights = True)
+        _callbacks.append(biw_callback)
     if a=='--cpu':        
         # This disables my GPU.
         os.environ["CUDA_VISIBLE_DEVICES"]=""
     if a=='-p':
         _npath = int(o)
     if a=='-h':
-        print(['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'printdweight', 'cpu'])
+        print(['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'logdweight', 'cpu'])
         sys.exit()
 
 flows, noiseless_flows, edge_adj, expected_paths = load_data(path)
@@ -175,14 +183,14 @@ model.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
     #optimizer=tf.keras.optimizers.SGD(learning_rate=learning_rate),
     loss=[tf.keras.losses.MSE, None],
-    #metrics={'bottleneck': mean_pred}
+    metrics={'bottleneck': mean_pred}
 )
 
 
 model.fit(
     x={'input_node_features': _flows, 'adjacency': A},
     y= _flows,
-    validation_split = 0.3,
+    validation_split = 0.0,
     batch_size=batch_size,
     epochs=n_epochs,
     callbacks=_callbacks
@@ -190,22 +198,16 @@ model.fit(
 
 
 
-e_shape = expected_paths.shape
-e_img = np.reshape(expected_paths, [1, e_shape[0], e_shape[1], 1])
-e_path = os.path.join(_log_dir, 'e_paths')
-file_writer = tf.summary.create_file_writer(e_path)
-with file_writer.as_default():
-    tf.summary.image("Expected paths", e_img, step=0, description='expected paths to be learned')
+
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 print(model.summary())
 weights = model.get_layer('decoder').get_weights()
 paths = weights[0]
 now = datetime.now()
+e_shape = expected_paths.shape
 l_shape = paths[0].shape
 l_img = np.reshape(paths, [1, n_paths, e_shape[1], 1])
-l_path = os.path.join(_log_dir, now.strftime("%H:%M:%S"))
-file_writer = tf.summary.create_file_writer(l_path)
 with file_writer.as_default():
     tf.summary.image("Learned paths", l_img, step=0, description='Learned paths from decoder')
 print(paths)
@@ -217,3 +219,10 @@ l1_epath = expected_paths
 
 # To predict after fitting the model:
 #model.predict(x={foobar})
+
+
+e_img = np.reshape(expected_paths, [1, e_shape[0], e_shape[1], 1])
+e_path = os.path.join(_log_dir, 'e_paths')
+file_writer = tf.summary.create_file_writer(e_path)
+with file_writer.as_default():
+    tf.summary.image("Expected paths", e_img, step=0, description='expected paths to be learned')

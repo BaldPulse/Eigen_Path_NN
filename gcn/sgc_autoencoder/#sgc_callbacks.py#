@@ -57,7 +57,6 @@ class Decoder_weights(keras.callbacks.Callback):
         dweight = self.model.get_layer('bottleneck').get_weights()
         print(dweight)
 
-logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
 file_writer = tf.summary.create_file_writer(logdir + "/metrics")
 file_writer.set_as_default()
         
