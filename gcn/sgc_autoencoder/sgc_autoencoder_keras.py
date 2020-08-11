@@ -1,13 +1,19 @@
 import os
 # This disables my GPU.
 #os.environ["CUDA_VISIBLE_DEVICES"]=""
-
+import sys, getopt
+optlist, args = getopt.getopt(sys.argv[1:], 'n:p:h', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'printdweight', 'cpu', 'logbweight=', 'lowerthreshold=', 'upperthreshold=', 'name='])
+for a,o in optlist:
+    if a=='--cpu':        
+        # This disables my GPU.
+        os.environ["CUDA_VISIBLE_DEVICES"]=""
+    
 import tensorflow as tf
 import numpy as np
 import numpy.linalg as npla
-import sys, getopt
 from sgc_layer_utils import *
 from sgc_callbacks import *
+from sgc_path_utils import *
 
 
 def prepare_adj(adj):
@@ -47,7 +53,8 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
                                    #kernel_initializer=tf.keras.initializers.GlorotNormal(seed=None),
                                    kernel_initializer=tf.keras.initializers.RandomUniform(minval=0., maxval=1.),
                                    kernel_regularizer = tf.keras.regularizers.l2(l=0.01),
-                                   name='bottleneck')(sgc_out)
+                                   name='bottleneck',
+                                   use_bias = True)(sgc_out)
 
     decode = sgc_decoder(num_nodes,
                          name = 'decoder',
@@ -86,21 +93,19 @@ def create_profusion(pure0, pure1, mixed, mixed_portion):
     sample = np.append(pure1[np.random.choice(pure1.shape[0], size=pure_num, replace=False)], sample, axis=0)
     return sample
 
-optlist, args = getopt.getopt(sys.argv[1:], 'n:p:h', ['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'printdweight', 'cpu', 'logbweight=', ''])
-
 learning_rate = 0.00008
 batch_size = 32
 n_epochs = 300
 
 _log_dir = "logs/" + datetime.now().strftime("%Y%m%d-%H%M%S")
 
-file_writer = tf.summary.create_file_writer(_log_dir)
+file_writer = None
 
 reduceLR_callback = tf.keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=50,)
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=_log_dir, write_images=False, histogram_freq=1)
 tbi_callback = TensorBoardImage('Image Example', log_dir = _log_dir)
 earlystop_callback = EarlyStoppingByLossVal(monitor='loss', value=3, verbose=0)
-biw_callback = Bottleneck_input_weights()
+biw_callback = Bottleneck_input_weights(log_dir = _log_dir)
 dw_callback = Decoder_weights()
 time_callback = TimeHistory()
 
@@ -115,6 +120,9 @@ use_profusion = False
 mixed_proportion = 0
 validation_prop = 0.0
 _npath = -1
+lthreshold = 0.1
+uthreshold = 0.9
+name = ''
 for a,o in optlist:
     if a=="-n":
         n_epochs=int(o)
@@ -139,14 +147,17 @@ for a,o in optlist:
         if o == 'p':
             biw_callback = Bottleneck_input_weights(print_weights = True)
         _callbacks.append(biw_callback)
-    if a=='--cpu':        
-        # This disables my GPU.
-        os.environ["CUDA_VISIBLE_DEVICES"]=""
+    if a=='--lowerthreshold':
+        lthreshold = float(o)
+    if a=='--upperthreshold':
+        uthreshold = float(o)
     if a=='-p':
         _npath = int(o)
     if a=='-h':
         print(['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'logdweight', 'cpu'])
         sys.exit()
+    if a=='--name':
+        name = o
 
 flows, noiseless_flows, edge_adj, expected_paths = load_data(path)
 flows = np.expand_dims(flows, 2)
@@ -208,21 +219,24 @@ now = datetime.now()
 e_shape = expected_paths.shape
 l_shape = paths[0].shape
 l_img = np.reshape(paths, [1, n_paths, e_shape[1], 1])
-with file_writer.as_default():
-    tf.summary.image("Learned paths", l_img, step=0, description='Learned paths from decoder')
+l_img = tf.image.resize(l_img, [n_paths*5, e_shape[1]*5 ])
 print(paths)
 #print(weights[0])
-l1_epath = expected_paths
-#print(l1_epath)
-#sim = evaluate_path_similarities(l1_epath, paths.numpy())
-#print(sim)
+epath = expected_paths
+epath_sig = str(np.nonzero(epath))
+#print(epath)
+sim, vm, vs = evaluate_path_similarities(epath, binarize_paths(paths, lthres = lthreshold, uthres = uthreshold))
+print("similarity index", sim)
+file_writer = tf.summary.create_file_writer(_log_dir)
+with file_writer.as_default():
+    tf.summary.image("Learned paths\n" + epath_sig, l_img, step=0, description='Learned paths from decoder,'+ name + ', sim= %s' % sim + str(vm) + str(vs))
 
-# To predict after fitting the model:
-#model.predict(x={foobar})
+
 
 
 e_img = np.reshape(expected_paths, [1, e_shape[0], e_shape[1], 1])
-e_path = os.path.join(_log_dir, 'e_paths')
+e_img = tf.image.resize(e_img, [n_paths*5, e_shape[1]*5 ])
+e_path = "logs/" +epath_sig +'/'
 file_writer = tf.summary.create_file_writer(e_path)
 with file_writer.as_default():
     tf.summary.image("Expected paths", e_img, step=0, description='expected paths to be learned')

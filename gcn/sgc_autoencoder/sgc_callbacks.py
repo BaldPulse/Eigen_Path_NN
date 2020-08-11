@@ -56,18 +56,16 @@ class Decoder_weights(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs={}):
         dweight = self.model.get_layer('bottleneck').get_weights()
         print(dweight)
-
-logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-file_writer = tf.summary.create_file_writer(logdir + "/metrics")
-file_writer.set_as_default()
         
 class Bottleneck_input_weights(keras.callbacks.Callback):
-    def __init__(self, print_weights = False):
+    def __init__(self, print_weights = False, log_dir = 'logs/'):
         self.p = print_weights
+        self.fw = tf.summary.create_file_writer(log_dir)
         
     def on_epoch_end(self, epoch, logs={}):
         bweight = self.model.get_layer('bottleneck').get_weights()
         bweight_sum = K.sum(bweight[0], axis=0)
+        self.fw.set_as_default()
         tf.summary.scalar('bottleneck weights', data=K.mean(bweight_sum), step=epoch)
         if self.p:
             print(bweight_sum)
