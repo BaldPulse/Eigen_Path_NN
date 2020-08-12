@@ -59,7 +59,7 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     decode = sgc_decoder(num_nodes,
                          name = 'decoder',
                          kernel_constraint = clip_weights(),
-                         kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.0, ks = 0., kv = 0.0),
+                         kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.0, ks = 0.01, kv = 0.0),
                          #kernel_regularizer = soft_binarize(0.0),
                          )(latent)
     decode = tf.keras.layers.Reshape((num_nodes, 1))(decode)
