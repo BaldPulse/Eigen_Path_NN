@@ -52,7 +52,7 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
                                    activation='relu',
                                    #kernel_initializer=tf.keras.initializers.GlorotNormal(seed=None),
                                    kernel_initializer=tf.keras.initializers.RandomUniform(minval=0., maxval=1.),
-                                   kernel_regularizer = tf.keras.regularizers.l2(l=0.01),
+                                   kernel_regularizer = tf.keras.regularizers.l2(l=0.02),
                                    name='bottleneck',
                                    use_bias = True)(sgc_out)
 
@@ -82,82 +82,29 @@ def load_data(path):
         print('no noiseless flows in'+path)
     return flows, noiseless_flows, edge_adj, expected_paths
 
-def create_profusion(pure0, pure1, mixed, mixed_portion):
-    print('pure0', pure0.shape)
-    total = 2000
-    mixed_num = int(total * mixed_portion)
-    pure_num = int((total - mixed_num)/2)
-    #print(np.random.choice(pure0.shape[0], size=pure_num, replace=False))
-    sample = np.append(pure0[np.random.choice(pure0.shape[0], size=pure_num, replace=False)],\
-                       mixed[np.random.choice(mixed.shape[0], size=mixed_num, replace=False)], axis=0)
-    sample = np.append(pure1[np.random.choice(pure1.shape[0], size=pure_num, replace=False)], sample, axis=0)
-    return sample
 
 learning_rate = 0.00008
 batch_size = 32
-n_epochs = 300
+n_epochs = 800
 
 _log_dir = "logs/" + datetime.now().strftime("%Y%m%d-%H%M%S")
 
 file_writer = None
 
-reduceLR_callback = tf.keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=50,)
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=_log_dir, write_images=False, histogram_freq=1)
 tbi_callback = TensorBoardImage('Image Example', log_dir = _log_dir)
-earlystop_callback = EarlyStoppingByLossVal(monitor='loss', value=3, verbose=0)
-biw_callback = Bottleneck_input_weights(log_dir = _log_dir)
-dw_callback = Decoder_weights()
-time_callback = TimeHistory()
 
-path = '../data/baseline/'
+path = '../data/simple_data/baseline_normalized_nl_0.2/'
 
 
 
 
-_callbacks = []#[reduceLR_callback]
-use_noiseless = False
-use_profusion = False
-mixed_proportion = 0
+_callbacks = [tensorboard_callback]
 validation_prop = 0.0
 _npath = -1
 lthreshold = 0.1
 uthreshold = 0.9
 name = ''
-for a,o in optlist:
-    if a=="-n":
-        n_epochs=int(o)
-    if a=='--noiseless':
-        use_noiseless = True
-    if a=='--mixed':
-        use_profusion = True
-        print('mixed proportion', o)
-        mixed_proportion = float(o)
-    if a=='--data':
-        path='../data/'+o
-    if a=='--tensorboard':
-        _callbacks.append(tensorboard_callback)
-    if a=='--tbi':
-        _callbacks.append(tbi_callback)  
-    if a=='--earlystop':
-        _callbacks.append(earlystop_callback)
-    if a=='--printdweight':
-        _callbacks.append(dw_callback)
-    if a=='--logbweight':
-        print('biw logging enabled')
-        if o == 'p':
-            biw_callback = Bottleneck_input_weights(print_weights = True)
-        _callbacks.append(biw_callback)
-    if a=='--lowerthreshold':
-        lthreshold = float(o)
-    if a=='--upperthreshold':
-        uthreshold = float(o)
-    if a=='-p':
-        _npath = int(o)
-    if a=='-h':
-        print(['noiseless', 'data=', 'earlystop', 'tbi', 'tensorboard', 'mixed=', 'logdweight', 'cpu'])
-        sys.exit()
-    if a=='--name':
-        name = o
 
 flows, noiseless_flows, edge_adj, expected_paths = load_data(path)
 flows = np.expand_dims(flows, 2)
@@ -165,23 +112,11 @@ noiseless_flows = np.expand_dims(noiseless_flows, 2)
 A = prepare_adj(edge_adj)
 A = np.tile(np.expand_dims(A, 0), (flows.shape[0], 1, 1))  # Adding a dummy batch dimension
 
-if use_profusion:
-    mixed_path = '../data/baseline_mixed/'
-    m_flows, m_noiseless_flows, edge_adj, expected_paths = load_data(mixed_path)
-    pure0_path = '../data/baseline_pure0/'
-    p0_flows, p0_noiseless_flows, edge_adj, p0_expected_paths = load_data(pure0_path)
-    pure1_path = '../data/baseline_pure1/'
-    p1_flows, p1_noiseless_flows, edge_adj, p1_expected_paths = load_data(pure1_path)
-    flows = create_profusion(p0_flows, p1_flows, m_flows, mixed_proportion)
-    noiseless_flows = create_profusion(p0_noiseless_flows, p1_noiseless_flows, m_noiseless_flows, mixed_proportion)
-
 n_edges = flows.shape[1]
 n_sgc_feats = 32
 n_flows = 5
 n_paths = expected_paths.shape[0]
 _flows = flows
-if use_noiseless:
-    _flows = noiseless_flows
 if _npath >0:
     n_paths = _npath
 
@@ -192,7 +127,6 @@ model = get_sgc_model(n_edges,
 
 model.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-    #optimizer=tf.keras.optimizers.SGD(learning_rate=learning_rate),
     loss=[tf.keras.losses.MSE, None],
     metrics={'bottleneck': mean_pred}
 )
