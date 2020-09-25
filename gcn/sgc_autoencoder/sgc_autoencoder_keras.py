@@ -17,6 +17,7 @@ from sgc_path_utils import *
 
 
 def prepare_adj(adj):
+    print("adjacency matrix (edge)", adj[0:5])
     I = np.identity(adj.shape[0])
     adj_bar = adj + I
     D = np.sum(adj_bar, axis = 1)
