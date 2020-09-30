@@ -38,28 +38,89 @@ def find_linked_path(paths, list_A):
      1 when link is performed
      0 when no link in performed
     '''
-    for i in range(len(paths)):
+    l = len(paths)
+    print('pathlength', l)
+    i = 0
+    while i < l:
         for j in range(len(paths)):
-            if i != j and list_A[j][0] in list_A[paths[i][-1]]:
-                list_A[i].append(list_A[j])
-                list_A.pop(j)
-                return 1
+            #print('ij', paths[i], paths[j])
+            if i != j and (paths[j][0] in list_A[paths[i][-1]]):
+                paths[i] = paths[i] + paths[j]
+                #print(' ', paths[i], paths)
+                paths.pop(j)
+                if j < i:
+                    i = i-2
+                else:
+                    i = i-1
+                l = l-1
+                break
+        i = i+1
     return 0
     
-
-def connect_edges(rigid_edges, soft_edges, A):
-    '''
-    
-    '''
+def adj_to_list(A):
     list_A = []
     for i in range(A.shape[0]):
         adj = []
         for j in range(A.shape[1]):
             if A[i,j] == 1:
                 adj.append(j)
-        A.append(adj)
-    for i in range(len(rigid_edges)):
-        for j in range(len(rigid_edges[i])):
-            if i != j and rigid_edges[i][j] in list_A[i]:
-                
+        list_A.append(adj)
+    return list_A
+
+def connect_edges(rigid_edges, soft_edges, A):
+    '''
+    connect the available edges, favors connections edges in the same set
+    input:
+     rigid_edges: edges that are weighed high enough for it to be considered rigid
+     soft_edges: edges that re weighed high enough to be significant but not high enough to be considered rigid
+    output:
+     all_paths: all paths that are found
+    '''
+    list_A = adj_to_list(A)
+    paths = list(rigid_edges)
+    for i in range(len(paths)):
+        find_linked_path(paths[i], list_A)
+    #try to add edges to connect sets with only two existing paths
+    for i in range(len(paths)):
+        if len(paths[i]) == 2:
+            paths[i][0].append(paths[i][1])
+            paths[i].pop(1)
+    all_paths = []
+    broken_paths =[]
+    for i in range(len(paths)):
+        if len(paths[i]) == 1:
+            all_paths.append(paths[i][0])
+            continue
+        for j in range(len(paths[i])):
+            broken_paths.append(paths[i][j])
+    ind = 1
+    if broken_paths == []:
+        ind = 0
+    else:
+        find_linked_path(broken_paths, list_A)
+    all_paths.append(broken_paths)
+    return all_paths, ind
             
+if __name__ == "__main__":
+    A   = np.array([[0,1,1,1,0,0,0,0,0,0],
+                    [1,0,1,1,1,0,0,0,0,0],
+                    [1,0,0,1,0,0,0,0,0,0],
+                    [1,1,1,0,1,0,0,0,0,0],
+                    [0,1,0,1,0,1,0,0,0,0],
+                    [0,0,0,0,1,0,1,0,0,1],
+                    [0,0,0,0,0,1,0,1,0,1],
+                    [0,0,0,0,0,0,1,0,1,0],
+                    [0,0,0,0,0,0,0,1,0,1],
+                    [0,0,0,0,0,1,1,0,1,0]])
+    list_A = []
+    for i in range(A.shape[0]):
+        adj = []
+        for j in range(A.shape[1]):
+            if A[i,j] == 1:
+                adj.append(j)
+        list_A.append(adj)
+
+    p = [[5],[1],[2],[6],[7]]
+    print(list_A)
+    find_linked_path(p, list_A)
+    print(p)
