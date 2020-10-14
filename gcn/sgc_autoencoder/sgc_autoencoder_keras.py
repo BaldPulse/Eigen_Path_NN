@@ -123,16 +123,22 @@ A = np.tile(np.expand_dims(A, 0), (flows.shape[0], 1, 1))  # Adding a dummy batc
 n_edges = flows.shape[1]
 n_sgc_feats = 32
 n_flows = 5
-n_paths = expected_paths.shape[0]
+n_paths = 1
 _flows = flows
-if _npath >0:
-    n_paths = _npath
 
+rearrange = 1
+list_adj = adj_to_list(edge_adj)
 
-while rearrage == 1:
-    model = get_sgc_model(n_edges, 
-                          num_sgc_feats=n_sgc_feats, 
-                          latent_size=n_paths)
+while rearrange == 1:
+    if n_paths = 1:
+        model = get_sgc_model(n_edges, 
+                              num_sgc_feats=n_sgc_feats, 
+                              latent_size=n_paths)
+    else:
+        model = get_sgc_model(n_edges, 
+                              num_sgc_feats=n_sgc_feats, 
+                              latent_size=n_paths,
+                              all_paths = identified_paths)
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
@@ -150,10 +156,14 @@ while rearrage == 1:
         callbacks=_callbacks
     )
     weights = model.get_layer('decoder').get_weights()
-    rigid_edges, soft_edges = identify_edges()
+    print(weights[0])
+    rigid_edges, _ = identify_edges(weights[0])
+    print(rigid_edges)
+    find_linked_path(rigid_edges[0], list_adj)
+    print(rigid_edges)
+    break
 
-
-
+'''
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 print(model.summary())
@@ -184,3 +194,4 @@ e_path = "logs/" +epath_sig +'/'
 file_writer = tf.summary.create_file_writer(e_path)
 with file_writer.as_default():
     tf.summary.image("Expected paths", e_img, step=0, description='expected paths to be learned')
+'''
