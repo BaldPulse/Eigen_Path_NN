@@ -39,7 +39,7 @@ def find_linked_path(paths, list_A):
      0 when no link in performed
     '''
     l = len(paths)
-    print('pathlength', l)
+    #print('pathlength', l)
     i = 0
     while i < l:
         for j in range(len(paths)):
@@ -80,11 +80,12 @@ def connect_edges(rigid_edges, soft_edges, A):
     paths = list(rigid_edges)
     for i in range(len(paths)):
         find_linked_path(paths[i], list_A)
+    print('found raw connections', paths)
     #try to add edges to connect sets with only two existing paths
-    for i in range(len(paths)):
+    '''for i in range(len(paths)):
         if len(paths[i]) == 2:
             paths[i][0].append(paths[i][1])
-            paths[i].pop(1)
+            paths[i].pop(1)'''
     all_paths = []
     broken_paths =[]
     for i in range(len(paths)):

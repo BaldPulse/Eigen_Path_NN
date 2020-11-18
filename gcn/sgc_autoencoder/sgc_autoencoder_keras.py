@@ -130,7 +130,7 @@ rearrange = 1
 list_adj = adj_to_list(edge_adj)
 
 while rearrange == 1:
-    if n_paths = 1:
+    if n_paths == 1:
         model = get_sgc_model(n_edges, 
                               num_sgc_feats=n_sgc_feats, 
                               latent_size=n_paths)
@@ -157,10 +157,12 @@ while rearrange == 1:
     )
     weights = model.get_layer('decoder').get_weights()
     print(weights[0])
-    rigid_edges, _ = identify_edges(weights[0])
+    rigid_edges, soft_edges = identify_edges(weights[0])
     print(rigid_edges)
-    find_linked_path(rigid_edges[0], list_adj)
-    print(rigid_edges)
+    identified_paths, _ =connect_edges(rigid_edges, soft_edges, edge_adj)
+    print(identified_paths)
+    #find_linked_path(rigid_edges[0], list_adj)
+    #print(rigid_edges)
     break
 
 '''
