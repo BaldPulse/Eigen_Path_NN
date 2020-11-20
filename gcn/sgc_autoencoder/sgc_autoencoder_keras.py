@@ -11,10 +11,10 @@ for a,o in optlist:
 import tensorflow as tf
 import numpy as np
 import numpy.linalg as npla
-from sgc_layer_utils import *
-from sgc_callbacks import *
-from sgc_path_utils import *
-from join_paths import *
+from sgc_layer_utils import sgc_decoder, l1l2_softmax, correlation, l1l2_corr_sm, soft_binarize, clip_weights, mean_pred
+from sgc_callbacks import TensorBoardImage, datetime
+from sgc_path_utils import binarize_paths, weighted_jaccard, jaccard_multiset, evaluate_path_similarities, l1_normalize
+from join_paths import identify_edges, find_linked_path, adj_to_list, connect_edges
 
 
 def prepare_adj(adj):
@@ -95,14 +95,16 @@ learning_rate = 0.00008
 batch_size = 32
 n_epochs = 800
 
-_log_dir = "logs/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+_log_dir = "/home/zhao/Documents/Eigen_Path_NN/gcn/sgc_autoencoder/logs/" + datetime.now().strftime("%Y%m%d-%H%M%S")
 
 file_writer = None
 
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=_log_dir, write_images=False, histogram_freq=1)
 tbi_callback = TensorBoardImage('Image Example', log_dir = _log_dir)
 
-path = '../data/simple_data/baseline_normalized_nl_0.2/'
+current_path= os.getcwd()
+print(current_path)
+path = '/home/zhao/Documents/Eigen_Path_NN/gcn/data/simple_data/baseline_normalized_nl_0.2/'
 
 
 
@@ -128,6 +130,7 @@ _flows = flows
 
 rearrange = 1
 list_adj = adj_to_list(edge_adj)
+identified_paths = None
 
 while rearrange == 1:
     if n_paths == 1:
@@ -156,14 +159,20 @@ while rearrange == 1:
         callbacks=_callbacks
     )
     weights = model.get_layer('decoder').get_weights()
-    print(weights[0])
     rigid_edges, soft_edges = identify_edges(weights[0])
     print(rigid_edges)
     identified_paths, _ =connect_edges(rigid_edges, soft_edges, edge_adj)
     print(identified_paths)
+    file_writer = tf.summary.create_file_writer(_log_dir)
+    paths = weights[0]
+    l_shape = paths[0].shape
+    l_img = np.reshape(paths, [1, n_paths, paths.shape[1], 1])
+    l_img = tf.image.resize(l_img, [n_paths*5, paths.shape[1]*5 ])
+    with file_writer.as_default():
+        tf.summary.image("Learned paths\n", l_img, step=0)
+
     #find_linked_path(rigid_edges[0], list_adj)
     #print(rigid_edges)
-    break
 
 '''
 np.set_printoptions(precision=3)
