@@ -98,8 +98,9 @@ def connect_edges(rigid_edges, soft_edges, A):
     if broken_paths == []:
         ind = 0
     else:
+        print("found broken paths", broken_paths)
         find_linked_path(broken_paths, list_A)
-    all_paths.append(broken_paths)
+    all_paths+=(broken_paths)
     return all_paths, ind
             
 if __name__ == "__main__":
