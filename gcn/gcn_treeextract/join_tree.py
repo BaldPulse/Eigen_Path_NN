@@ -1,5 +1,7 @@
 import numpy as np
-
+'''
+legacy code for tree extraction
+'''
 def identify_tree_edges(paths, l_thres = 0.3, u_thres = 0.8):
     '''
     returns useful edges in terms of descending contribution

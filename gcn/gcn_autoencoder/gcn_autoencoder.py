@@ -1,6 +1,10 @@
 import tensorflow as tf
 import numpy as np
 
+'''
+legacy code for gcn autoencoder
+'''
+
 def gcn_output(A, H, W):
     layer = tf.matmul(H, W)
     layer = tf.matmul(A, layer)#H_out = AH_lW

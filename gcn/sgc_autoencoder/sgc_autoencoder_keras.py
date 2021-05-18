@@ -41,6 +41,7 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     ----
     Returns: A Keras model which takes as input `input_node_features` and `adjacency` and outputs
         a matrix of the same shape as `input_node_features`. 
+        also allows for output of latent layer for uses in propagation loss
     '''
     I = tf.keras.Input((num_nodes, 1), name='input_node_features')
     A = tf.keras.Input((num_nodes, num_nodes), name='adjacency')
@@ -117,30 +118,3 @@ tbi_callback = TensorBoardImage('Image Example', log_dir = _log_dir)
 current_path= os.getcwd()
 print(current_path)
 path = '/home/zhao/Documents/Eigen_Path_NN/gcn/data/simple_data/baseline_normalized_nl_0.2/'
-
-
-
-
-_callbacks = [tensorboard_callback]
-validation_prop = 0.0
-_npath = -1
-lthreshold = 0.1
-uthreshold = 0.9
-name = ''
-
-flows, noiseless_flows, edge_adj, expected_paths = load_data(path)
-flows = np.expand_dims(flows, 2)
-noiseless_flows = np.expand_dims(noiseless_flows, 2)
-A = prepare_adj(edge_adj)
-A = np.tile(np.expand_dims(A, 0), (flows.shape[0], 1, 1))  # Adding a dummy batch dimension
-
-n_edges = flows.shape[1]
-n_sgc_feats = 32
-n_flows = 5
-n_paths = 1
-_flows = flows
-
-rearrange = 1
-list_adj = adj_to_list(edge_adj)
-identified_paths = None
-count = 0

@@ -1,6 +1,10 @@
 import tensorflow as tf
 import numpy as np
 import numpy.linalg as npla
+'''
+legacy code for gcn
+'''
+
 
 def prepare_adj(adj):
     '''
