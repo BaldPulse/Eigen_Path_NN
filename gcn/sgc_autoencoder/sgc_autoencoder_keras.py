@@ -180,36 +180,3 @@ while rearrange == 1:
         n_epochs = n_epochs/2
     #find_linked_path(rigid_edges[0], list_adj)
     #print(rigid_edges)
-
-'''
-np.set_printoptions(precision=3)
-np.set_printoptions(suppress=True)
-print(model.summary())
-weights = model.get_layer('decoder').get_weights()
-paths = weights[0]
-now = datetime.now()
-e_shape = expected_paths.shape
-l_shape = paths[0].shape
-l_img = np.reshape(paths, [1, n_paths, e_shape[1], 1])
-l_img = tf.image.resize(l_img, [n_paths*5, e_shape[1]*5 ])
-print(paths)
-#print(weights[0])
-epath = expected_paths
-epath_sig = str(np.nonzero(epath))
-#print(epath)
-sim, vm, vs = evaluate_path_similarities(epath, binarize_paths(paths, lthres = lthreshold, uthres = uthreshold))
-print("similarity index", sim)
-file_writer = tf.summary.create_file_writer(_log_dir)
-with file_writer.as_default():
-    tf.summary.image("Learned paths\n" + epath_sig, l_img, step=0, description='Learned paths from decoder,'+ name + ', sim= %s' % sim + str(vm) + str(vs))
-
-
-
-
-e_img = np.reshape(expected_paths, [1, e_shape[0], e_shape[1], 1])
-e_img = tf.image.resize(e_img, [n_paths*5, e_shape[1]*5 ])
-e_path = "logs/" +epath_sig +'/'
-file_writer = tf.summary.create_file_writer(e_path)
-with file_writer.as_default():
-    tf.summary.image("Expected paths", e_img, step=0, description='expected paths to be learned')
-'''
