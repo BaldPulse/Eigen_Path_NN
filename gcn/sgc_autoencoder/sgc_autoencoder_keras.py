@@ -70,6 +70,9 @@ def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
     return model
 
 def set_weights(model, all_paths):
+    '''
+    initialize/set the weight of a keras model by the paths provided. The dimensions of the paths must correspond to the dimensions of the model
+    '''
     decode_layer = model.get_layer('decoder')
     decode_weights = decode_layer.get_weights()[0]
     latent_layer = model.get_layer('bottleneck')
@@ -82,6 +85,9 @@ def set_weights(model, all_paths):
     decode_layer.set_weights([decode_weights])
 
 def load_data(path):
+    '''
+    load synthetic data produced by the jupyter notebook in the data directory
+    '''
     flows = np.load(os.path.join(path, 'flows.npy'))
     edge_adj = np.load(os.path.join(path, 'adj.npy'))
     try:
@@ -138,45 +144,3 @@ rearrange = 1
 list_adj = adj_to_list(edge_adj)
 identified_paths = None
 count = 0
-while rearrange == 1:
-    count += 1
-    model = get_sgc_model(n_edges, 
-                            num_sgc_feats=n_sgc_feats, 
-                            latent_size=n_paths)
-
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-        loss=[tf.keras.losses.MSE, None],
-        metrics={'bottleneck': mean_pred}
-    )
-    print("weights", model.get_layer("bottleneck").get_weights())
-    if n_paths != 1:
-        set_weights(model, identified_paths)
-    print(type(n_epochs))
-    model.fit(
-        x={'input_node_features': _flows, 'adjacency': A},
-        y= _flows,
-        validation_split = 0.0,
-        batch_size=batch_size,
-        epochs=n_epochs,
-        callbacks=_callbacks
-    )
-    weights = model.get_layer('decoder').get_weights()
-    rigid_edges, soft_edges = identify_edges(weights[0])
-    print(rigid_edges)
-    identified_paths, _ =connect_edges(rigid_edges, soft_edges, edge_adj)
-    print(identified_paths)
-    file_writer = tf.summary.create_file_writer(_log_dir)
-    paths = weights[0]
-    l_shape = paths[0].shape
-    l_img = np.reshape(paths, [1, n_paths, paths.shape[1], 1])
-    l_img = tf.image.resize(l_img, [n_paths*5, paths.shape[1]*5 ])
-    with file_writer.as_default():
-        tf.summary.image("Learned paths" + str(count), l_img, step=0)
-    if(n_paths == len(identified_paths)):
-        break
-    else:
-        n_paths = len(identified_paths)
-        n_epochs = n_epochs/2
-    #find_linked_path(rigid_edges[0], list_adj)
-    #print(rigid_edges)
