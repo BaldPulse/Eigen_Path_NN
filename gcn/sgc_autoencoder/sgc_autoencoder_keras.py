@@ -11,11 +11,12 @@ for a,o in optlist:
 import tensorflow as tf
 import numpy as np
 import numpy.linalg as npla
+
+from graph import Network, Network_flows, Propagation
 from sgc_layer_utils import sgc_decoder, l1l2_softmax, correlation, l1l2_corr_sm, soft_binarize, clip_weights, mean_pred
 from sgc_callbacks import TensorBoardImage, datetime
 from sgc_path_utils import binarize_paths, weighted_jaccard, jaccard_multiset, evaluate_path_similarities, l1_normalize
 from join_paths import identify_edges, find_linked_path, adj_to_list, connect_edges
-from graph import Network, Network_flows, Propagation
 
 def prepare_adj(adj):
     print("adjacency matrix (edge)", adj[0:5])
@@ -32,10 +33,10 @@ def sgc_layer(H, A, featsize, numhop):
     return layer
 
 
-def get_sgc_model(A_0, num_nodes=41, num_sgc_feats=32, latent_size=1):
+def get_sgc_model(G, sources, num_sgc_feats=32, latent_size=1):
     '''
     Input:
-    num_nodes: Number of nodes(edges) in the network, as represented by the edge dual adjacency graph
+    G: a representation of the network
     num_sgc_feats: Number of features that the SGC outputs per node(edge).
     latent_size: Size of the latent representation.
     ----
@@ -43,8 +44,8 @@ def get_sgc_model(A_0, num_nodes=41, num_sgc_feats=32, latent_size=1):
         a matrix of the same shape as `input_node_features`. 
         also allows for output of latent layer for uses in propagation loss
     '''
-    I = tf.keras.Input((num_nodes, 1), name='input_node_features')
-    A = tf.keras.Input((num_nodes, num_nodes), name='adjacency')
+    I = tf.keras.Input((G.nNodes, 1), name='input_node_features')
+    A = tf.keras.Input((G.nNodes, G.nNodes), name='adjacency')
     
     sgc_out = sgc_layer(I, A, featsize=num_sgc_feats, numhop=4)  # Shape: [num_nodes, num_sgc_feats]
     sgc_out = tf.keras.layers.ReLU()(sgc_out)
@@ -59,15 +60,18 @@ def get_sgc_model(A_0, num_nodes=41, num_sgc_feats=32, latent_size=1):
                                    name='bottleneck',
                                    use_bias = True)(sgc_out)
 
-    decode_layer = sgc_decoder(num_nodes,
+    decode_layer = sgc_decoder(G.nNodes,
                          name = 'decoder',
                          kernel_constraint = clip_weights(),
                          kernel_regularizer = l1l2_corr_sm(l1 = 0.0, l2 = 0., kc = 0.0, ks = 0.01, kv = 0.0),
                          #kernel_regularizer = soft_binarize(0.0),
+                         Edges = G.Edges,
+                         nNodes = G.nNodes,
+                         sources = sources,
                          )
     decode = decode_layer(latent)
     
-    model = tf.keras.Model(inputs=(I, A), outputs=[decode, latent])
+    model = tf.keras.Model(inputs=(I, A), outputs=decode)
     return model
 
 def set_weights(model, all_paths):
@@ -103,6 +107,12 @@ def load_data(path):
         print('no noiseless flows in'+path)
     return flows, noiseless_flows, edge_adj, expected_paths
 
+
+n_edges = flows.shape[1]
+n_sgc_feats = 32
+n_flows = 5
+n_paths = 1
+_flows = flows
 
 learning_rate = 0.00008
 batch_size = 32

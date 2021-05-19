@@ -53,7 +53,7 @@ class Network_flows:
     '''
     represents flow snapshot data in terms of nodes and edges
     '''
-    def __init__(self, flows, network):
+    def __init__(self, flows, network:Network):
         self.edge_flows = flows
         self.netWork = network
 
@@ -66,8 +66,19 @@ class Network_flows:
                 node_flow[self.netWork.Edges[e][1]] += f[e]
             self.node_flows.append(node_flow)
 
-
-
+    def identify_sources(self):
+        '''
+        method for identifying source nodes. source nodes are defined as outgoing flows >> incoming flows
+        this is done by comparing the overall flow with the standard deviation of flows on edges
+        '''
+        self.sources = []
+        overall_flow = np.sum(self.node_flows, axis=0)
+        std_flow = np.std(overall_flow)
+        for i in range(self.Network.nNodes):
+            if(overall_flow[i] > std_flow):
+                self.sources.append(i)
+        return self.sources
+        
 class Propagation:
     def __init__(self, netWork, paths, sources, sinks):
         self.netWork = netWork
