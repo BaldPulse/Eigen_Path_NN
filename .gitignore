@@ -1,4 +1,6 @@
 *~
 *.npy
+*.v2
+*.pb
 **/logs
 **/log
