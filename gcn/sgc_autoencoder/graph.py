@@ -44,9 +44,9 @@ class Network:
         '''
         node_prop = np.zeros((self.nNodes, self.nNodes))
         for e in range(len(path)):
-            if path[e] ==1:
-                node_prop[self.Edges[e][0], self.Edges[e][1]] = 1
-        
+            node_prop[self.Edges[e][1], self.Edges[e][0]] = path[e]
+            # node_prop[self.Edges[e][0], self.Edges[e][0]] = 1 - path[e]
+        node_prop[0, :] = 1-np.sum(node_prop, axis=0)
         return node_prop
 
 class Network_flows:
@@ -71,44 +71,36 @@ class Network_flows:
 class Propagation:
     def __init__(self, netWork, paths, sources, sinks):
         self.netWork = netWork
-        self.paths = paths
         self.node_props = []
-        for p in self.paths:
-            self.node_props.append(self.netWork.path_to_node_prop(p))
         self.sources = sources
         self.sinks = sinks
-        self.path_to_mult()
         
-    def path_to_mult(self):
-        self.path_matrices = []
-        for path in self.paths:
-            mult = np.zeros((self.netWork.nNodes, self.netWork.nNodes))
-            for e in range(self.netWork.nEdges):
-                mult[self.netWork.Edges[e][1], self.netWork.Edges[e][0]] = path[e]
-            self.path_matrices.append(mult)
 
-    def propagate(self,factors):
+    def propagate(self,factors, paths):
         '''
         factor: # of flows*p array factor for each path, wich will be used as the starting flow in each source node
         note: path and factor are aligned such that paths*factor will give the L2 loss
         '''
         prop_flows = np.zeros((factors.shape[0], self.netWork.nNodes))
         flow_count = 0
+        node_prop  = []
+        for p in paths:
+            mult = self.netWork.path_to_node_prop(p)
+            node_prop.append(mult)
+        print("node prop \n", node_prop)
         for F in factors:
             prop_flow = np.zeros((F.shape[0], self.netWork.nNodes)) # # of paths * # of edges
             for i in range(len(F)):
                 for s in self.sources:
                     prop_flow[i, s] = F[i] #set every source to the path factor
-                # mult = self.path_to_mult(self.paths[i])
-                iter = np.count_nonzero(self.paths[i])
+                iter = np.count_nonzero(paths[i])
                 for j in range(iter):
-                    prop_flow[i] = np.dot(self.path_matrices[i], prop_flow[i].T).T
+                    prop_flow[i] = np.dot(node_prop[i], prop_flow[i].T).T
                 for s in self.sources:
                     prop_flow[i, s] -= F[i] #reset source by path factor to account for outgoing flows
             prop_flows[flow_count] = np.sum(prop_flow, axis=0)
             flow_count = flow_count+1
         return prop_flows
-                
                 
 
 if __name__ == "__main__":
@@ -143,6 +135,9 @@ if __name__ == "__main__":
     example_paths = np.array([[1,0,0,0,1,0,0,0,0,0,0,0],
                               [0,1,0,0,0,0,0,1,0,1,0,0]])
 
+    example_soft_paths = np.array([[1,0,0,0,0.5,0,0,0,0,0,0,0],
+                              [0,1,0,0,0,0,0,1,0,0.5,0,0]])
+
     example_network = Network(example_node_adj)
     test_edge_adj = example_network.adj_to_edge_adj(example_node_adj)
     # print(np.array_equiv(test_edge_adj, example_edge_adj), (test_edge_adj-example_edge_adj))
@@ -153,6 +148,8 @@ if __name__ == "__main__":
     print(example_flow.node_flows)
 
     example_propagation = Propagation(example_network, example_paths, [0], [4])
-    prop_result = example_propagation.propagate(example_factors)
+    prop_result = example_propagation.propagate(example_factors, example_paths)
     print(prop_result)
-    # print(example_propagation.path_matrices)
+
+    prop_result = example_propagation.propagate(example_factors, example_soft_paths)
+    print(prop_result)

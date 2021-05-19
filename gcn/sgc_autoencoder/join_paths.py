@@ -102,7 +102,8 @@ def connect_edges(rigid_edges, soft_edges, A):
         find_linked_path(broken_paths, list_A)
     all_paths+=(broken_paths)
     return all_paths, ind
-            
+
+#test code
 if __name__ == "__main__":
     A   = np.array([[0,1,1,1,0,0,0,0,0,0],
                     [1,0,0,1,1,0,0,0,0,0],

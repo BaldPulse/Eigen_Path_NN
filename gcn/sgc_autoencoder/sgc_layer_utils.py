@@ -10,6 +10,9 @@ import numpy as np
 import os
 from datetime import datetime
 
+
+
+
 class sgc_decoder(Layer):
 
     def __init__(self,
@@ -24,12 +27,26 @@ class sgc_decoder(Layer):
         self.kernel_initializer = keras.initializers.get(kernel_initializer)
         self.kernel_regularizer = keras.regularizers.get(kernel_regularizer)
         self.kernel_constraint = keras.constraints.get(kernel_constraint)
+
+        for key, value in kwargs.items():
+            if(key is "Edges"):
+                self.Edges = Edges
+                self.nEdges = len(Edges)
+            if(key is "nNodes"):
+                self.nNodes = nNodes
+            if(key is "sources"):
+                self.sources = sources
+        #create a source termplate tensor where the value of source nodes are 1
+        self.source_flow = tf.zeros([self.nNodes], tf.float32)
+        for s in self.sources:
+                self.source_flow[s] = 1.0
+        
         super(sgc_decoder, self).__init__(**kwargs)
 
     def build(self, input_shape):
         # Create a trainable weight variable for this layer.
         self.kernel = self.add_weight(name='kernel', 
-                                      shape=(input_shape[1], self.output_dim),
+                                      shape=(input_shape[1], self.nEdges),
                                       initializer=self.kernel_initializer,
                                       regularizer=self.kernel_regularizer,
                                       constraint=self.kernel_constraint,
@@ -37,10 +54,37 @@ class sgc_decoder(Layer):
         super(sgc_decoder, self).build(input_shape)
 
     def call(self, x):
-        return K.dot(x, self.kernel)
+        '''
+        multiple output decoder layer with two reconstructed flows:
+            output[0]: reconstruction based on propagation
+            output[1]: reconstruction based on linear combination
+        '''
+        factors = x
+        paths  = self.kernel
+        node_prop = tf.zeros([tf.shape(paths)[0],self.nNodes, self.nNodes], tf.float32)
+        for i in range(tf.shape(paths)[0]):
+            for e in range(nEdges):
+                node_prop[i,self.Edges[e][1], self.Edges[e][0]] = paths[i][e]
+        node_prop[:, 0, :] = 1-K.sum(node_prop, axis=1)
+        
+        prop_flows = tf.zeros([tf.shape(factors)[0], self.nNodes])
+        flow_count = 0
+        for factor in factors:
+            prop_flow = tf.zeros([factor.shape[0], self.nNodes]) # # of paths * # of edges
+            for i in range(len(factor)):
+                prop_flow[i] = self.source_flow[i] * factor[i] #set every source to the path factor
+                iter = tf.math.count_nonzero(paths[i])
+                for j in range(iter):
+                    prop_flow[i] = K.dot(node_prop[i], prop_flow[i].T).T
+                for s in self.sources:
+                    prop_flow[i, s] -= factor[i] #reset source by path factor to account for outgoing flows
+            prop_flows[flow_count] = K.sum(prop_flow, axis=0)
+            flow_count+=1
+
+        return [prop_flows, K.dot(x, paths)]
 
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], self.output_dim)
+        return [(input_shape[0], self.nNodes), (input_shape[0], self.nEdges)]
 
 
 import time

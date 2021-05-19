@@ -15,7 +15,7 @@ from sgc_layer_utils import sgc_decoder, l1l2_softmax, correlation, l1l2_corr_sm
 from sgc_callbacks import TensorBoardImage, datetime
 from sgc_path_utils import binarize_paths, weighted_jaccard, jaccard_multiset, evaluate_path_similarities, l1_normalize
 from join_paths import identify_edges, find_linked_path, adj_to_list, connect_edges
-
+from graph import Network, Network_flows, Propagation
 
 def prepare_adj(adj):
     print("adjacency matrix (edge)", adj[0:5])
@@ -32,11 +32,11 @@ def sgc_layer(H, A, featsize, numhop):
     return layer
 
 
-def get_sgc_model(num_nodes=41, num_sgc_feats=32, latent_size=1):
+def get_sgc_model(A_0, num_nodes=41, num_sgc_feats=32, latent_size=1):
     '''
     Input:
-    num_nodes: Number of nodes in the network.
-    num_sgc_feats: Number of features that the SGC outputs per node.
+    num_nodes: Number of nodes(edges) in the network, as represented by the edge dual adjacency graph
+    num_sgc_feats: Number of features that the SGC outputs per node(edge).
     latent_size: Size of the latent representation.
     ----
     Returns: A Keras model which takes as input `input_node_features` and `adjacency` and outputs
@@ -106,7 +106,7 @@ def load_data(path):
 
 learning_rate = 0.00008
 batch_size = 32
-n_epochs = 800
+n_epochs = 400
 
 _log_dir = "/home/zhao/Documents/Eigen_Path_NN/gcn/sgc_autoencoder/logs/" + datetime.now().strftime("%Y%m%d-%H%M%S")
 
@@ -118,3 +118,25 @@ tbi_callback = TensorBoardImage('Image Example', log_dir = _log_dir)
 current_path= os.getcwd()
 print(current_path)
 path = '/home/zhao/Documents/Eigen_Path_NN/gcn/data/simple_data/baseline_normalized_nl_0.2/'
+
+model = get_sgc_model(n_edges, 
+                            num_sgc_feats=n_sgc_feats, 
+                            latent_size=n_paths)
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+    loss=[tf.keras.losses.MSE, None],
+    metrics={'bottleneck': mean_pred}
+)
+print("weights", model.get_layer("bottleneck").get_weights())
+if n_paths != 1:
+    set_weights(model, identified_paths)
+print(type(n_epochs))
+model.fit(
+    x={'input_node_features': _flows, 'adjacency': A},
+    y= _flows,
+    validation_split = 0.0,
+    batch_size=batch_size,
+    epochs=n_epochs,
+    callbacks=_callbacks
+)
