@@ -10,7 +10,20 @@ import numpy as np
 import os
 from datetime import datetime
 
+'''
+sgc_layer_utils
+
+This file includes the utilities for the custom layers used in the autoencoder, namely the sgc_decoder layer
+'''
+
+
 class sgc_decoder(Layer):
+    '''
+    layer for decoder
+    Basically a simple dense layer
+    Custom definition allows for more flexible and transparent implementation, which
+    are helpful for expansion and debugging
+    '''
 
     def __init__(self,
                  output_dim,

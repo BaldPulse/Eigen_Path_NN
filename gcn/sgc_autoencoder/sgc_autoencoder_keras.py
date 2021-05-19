@@ -76,6 +76,9 @@ def load_data(path):
     return flows, noiseless_flows, edge_adj, expected_paths
 
 def create_profusion(pure0, pure1, mixed, mixed_portion):
+    '''
+    
+    '''
     print('pure0', pure0.shape)
     total = 2000
     mixed_num = int(total * mixed_portion)
