@@ -1,4 +1,5 @@
 *~
+*.npy
 *.pb
 *.v2
 *.trace.json.gz
