@@ -1,3 +1,8 @@
 *~
+*.npy
+*.v2
+*.pb
+*.profile-empty
+*.trace.json.gz
 **/logs
 **/log
