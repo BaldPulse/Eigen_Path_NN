@@ -143,13 +143,13 @@ model = get_sgc_model(network, network_flows.identify_sources(),
 
 model.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-    loss=[tf.keras.losses.MSE, None],
+    loss=[tf.keras.losses.MSE, tf.keras.losses.MSE],
     metrics={'bottleneck': mean_pred}
 )
 print(type(n_epochs))
 model.fit(
     x={'input_node_features': _flows, 'adjacency': A},
-    y= _flows,
+    y= [_flows, network_flows.node_flows],
     validation_split = 0.0,
     batch_size=batch_size,
     epochs=n_epochs,
