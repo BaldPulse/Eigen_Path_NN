@@ -94,7 +94,7 @@ def load_data(path):
     load synthetic data produced by the jupyter notebook in the data directory
     '''
     flows = np.load(os.path.join(path, 'flows.npy'))
-    edge_adj = np.load(os.path.join(path, 'adj.npy'))
+    edge_adj = np.load(os.path.join(path, 'node_adj.npy'))
     try:
         expected_paths = np.load(os.path.join(path, 'paths.npy'))
     except IOError:
@@ -108,10 +108,22 @@ def load_data(path):
     return flows, noiseless_flows, edge_adj, expected_paths
 
 
-n_edges = flows.shape[1]
+current_path= os.getcwd()
+print(current_path)
+path = '/home/zhao/Documents/Eigen_Path_NN/gcn/data/simple_data/baseline_prop/'
+
+flows, noiseless_flows, node_adj, expected_paths = load_data(path)
+
+network = Network(node_adj)
+A = prepare_adj(network.edge_adj)
+network_flows = Network_flows(flows, network)
+
+node_flows = network_flows.edge_flows_to_node_flows()
+
+n_edges = network.nEdges
 n_sgc_feats = 32
 n_flows = 5
-n_paths = 1
+n_paths = 2
 _flows = flows
 
 learning_rate = 0.00008
@@ -125,12 +137,8 @@ file_writer = None
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=_log_dir, write_images=False, histogram_freq=1)
 tbi_callback = TensorBoardImage('Image Example', log_dir = _log_dir)
 
-current_path= os.getcwd()
-print(current_path)
-path = '/home/zhao/Documents/Eigen_Path_NN/gcn/data/simple_data/baseline_normalized_nl_0.2/'
-
-model = get_sgc_model(n_edges, 
-                            num_sgc_feats=n_sgc_feats, 
+model = get_sgc_model(network, network_flows.identify_sources(),
+                            num_sgc_feats=n_sgc_feats,
                             latent_size=n_paths)
 
 model.compile(
@@ -138,9 +146,6 @@ model.compile(
     loss=[tf.keras.losses.MSE, None],
     metrics={'bottleneck': mean_pred}
 )
-print("weights", model.get_layer("bottleneck").get_weights())
-if n_paths != 1:
-    set_weights(model, identified_paths)
 print(type(n_epochs))
 model.fit(
     x={'input_node_features': _flows, 'adjacency': A},
@@ -148,5 +153,5 @@ model.fit(
     validation_split = 0.0,
     batch_size=batch_size,
     epochs=n_epochs,
-    callbacks=_callbacks
+    # callbacks=_callbacks
 )

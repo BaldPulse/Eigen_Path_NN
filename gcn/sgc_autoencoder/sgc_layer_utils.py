@@ -30,18 +30,19 @@ class sgc_decoder(Layer):
 
         for key, value in kwargs.items():
             if(key is "Edges"):
-                self.Edges = Edges
-                self.nEdges = len(Edges)
+                self.Edges = value
+                self.nEdges = len(value)
             if(key is "nNodes"):
-                self.nNodes = nNodes
+                self.nNodes = value
             if(key is "sources"):
-                self.sources = sources
+                self.sources = value
+                # print("self.sources", self.sources)
         #create a source termplate tensor where the value of source nodes are 1
         self.source_flow = tf.zeros([self.nNodes], tf.float32)
         for s in self.sources:
                 self.source_flow[s] = 1.0
         
-        super(sgc_decoder, self).__init__(**kwargs)
+        super(sgc_decoder, self).__init__()
 
     def build(self, input_shape):
         # Create a trainable weight variable for this layer.

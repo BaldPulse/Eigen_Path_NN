@@ -11,6 +11,8 @@ class Network:
     def __init__(self, adj):
         self.node_adj = adj
         self.nNodes = adj.shape[0]
+        self.adj_to_edge_adj(None)
+        
     def adj_to_edge_adj(self, adj):
         '''
         transforms node adjacency matrix to edge adjacency matrix
@@ -74,8 +76,8 @@ class Network_flows:
         self.sources = []
         overall_flow = np.sum(self.node_flows, axis=0)
         std_flow = np.std(overall_flow)
-        for i in range(self.Network.nNodes):
-            if(overall_flow[i] > std_flow):
+        for i in range(self.netWork.nNodes):
+            if(overall_flow[i] < -std_flow):
                 self.sources.append(i)
         return self.sources
         
@@ -157,6 +159,7 @@ if __name__ == "__main__":
     example_flow = Network_flows(example_edge_flow, example_network)
     example_flow.edge_flows_to_node_flows()
     print(example_flow.node_flows)
+    print(example_flow.identify_sources())
 
     example_propagation = Propagation(example_network, example_paths, [0], [4])
     prop_result = example_propagation.propagate(example_factors, example_paths)
