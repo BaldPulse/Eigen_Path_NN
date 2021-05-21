@@ -105,7 +105,7 @@ biw_callback = Bottleneck_input_weights()
 dw_callback = Decoder_weights()
 time_callback = TimeHistory()
 
-path = '../data/baseline/'
+path = '../data/simple_data/baseline/'
 
 
 
